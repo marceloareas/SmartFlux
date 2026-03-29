@@ -1,5 +1,6 @@
 package com.smartflux.api.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -55,6 +56,7 @@ public class UserService {
         newUser.setEmail(user.getEmail());
         newUser.setPasswordHash(user.getPasswordHash());
         newUser.setTimezone(user.getTimezone());
+        newUser.setUpdatedAt(LocalDateTime.now()); // Incluir no próximo commit
 
         return newUser;
     }
