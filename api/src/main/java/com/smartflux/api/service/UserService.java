@@ -31,6 +31,14 @@ public class UserService {
         return user;
     }
 
+    public User findUserByEmail(String email) {
+        User user = userRepository.findByEmail(email);
+        if (user == null) {
+            throw new ResourceNotFoundException("Usuário não encontrado");
+        }
+        return user;
+    }
+
     // POST ------------------------------------------------------------------
     public User insertUser(User user) {
         User newUser = new User();
@@ -60,4 +68,5 @@ public class UserService {
 
         return newUser;
     }
+
 }
