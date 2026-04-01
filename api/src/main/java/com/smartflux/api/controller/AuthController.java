@@ -19,12 +19,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/auth")
 @CrossOrigin(origins = "http://localhost:3000")
 @RequiredArgsConstructor
+@Tag(name = "Autenticação", description = "Endpoints de autenticação")
 public class AuthController {
 
     private final AuthService authService;

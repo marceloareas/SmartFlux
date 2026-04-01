@@ -1,5 +1,6 @@
 package com.smartflux.api.controller;
 
+import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import com.smartflux.api.model.Account;
 import com.smartflux.api.service.AccountService;
@@ -42,9 +44,11 @@ public class AccountController {
 
     // POST ------------------------------------------------------------------
     @PostMapping
-    public ResponseEntity<Account> insertAccount(@RequestBody Account account) {
+    public ResponseEntity<Void> insertAccount(@RequestBody Account account) {
         Account newAccount = accountService.insertAccount(account);
-        return ResponseEntity.ok().body(newAccount);
+        URI uri = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/{id}").buildAndExpand(newAccount.getId()).toUri();
+        return ResponseEntity.created(uri).build();
     }
 
     // DELETE ------------------------------------------------------------------
