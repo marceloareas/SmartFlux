@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final AccountService accountService;
 
     public List<User> findAllUser() {
         List<User> users = userRepository.findAll();
@@ -31,14 +32,28 @@ public class UserService {
         return user;
     }
 
+    public User findUserByEmail(String email) {
+        User user = userRepository.findByEmail(email);
+        if (user == null) {
+            throw new ResourceNotFoundException("Usuário não encontrado");
+        }
+        return user;
+    }
+
     // POST ------------------------------------------------------------------
+    @Transactional
     public User insertUser(User user) {
         User newUser = new User();
         newUser.setName(user.getName());
         newUser.setEmail(user.getEmail());
         newUser.setPasswordHash(user.getPasswordHash());
         newUser.setTimezone(user.getTimezone());
-        return userRepository.save(newUser);
+
+        userRepository.save(newUser);//Salva o usuario no banco (gera um id)
+
+        accountService.createDefaultAccount(newUser);//Pega o id criado e cria a conta padrão
+
+        return newUser;
     }
 
     // DELETE ------------------------------------------------------------------
@@ -56,8 +71,9 @@ public class UserService {
         newUser.setEmail(user.getEmail());
         newUser.setPasswordHash(user.getPasswordHash());
         newUser.setTimezone(user.getTimezone());
-        newUser.setUpdatedAt(LocalDateTime.now()); // Incluir no próximo commit
+        newUser.setUpdatedAt(LocalDateTime.now());
 
         return newUser;
     }
+
 }

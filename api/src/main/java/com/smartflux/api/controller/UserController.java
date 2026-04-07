@@ -1,5 +1,6 @@
 package com.smartflux.api.controller;
 
+import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
@@ -12,9 +13,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import com.smartflux.api.model.User;
-import com.smartflux.api.service.AccountService;
 import com.smartflux.api.service.UserService;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,7 +28,6 @@ import lombok.RequiredArgsConstructor;
 public class UserController {
 
     private final UserService userService;
-    private final AccountService accountService;
 
     // GET ------------------------------------------------------------------
     @GetMapping
@@ -44,10 +44,11 @@ public class UserController {
 
     // POST ------------------------------------------------------------------
     @PostMapping
-    public ResponseEntity<User> insertUser(@RequestBody User user) {
+    public ResponseEntity<Void> insertUser(@RequestBody User user) {
         User newUser = userService.insertUser(user);
-        accountService.createDefaultAccount(newUser);
-        return ResponseEntity.ok().body(newUser);
+        URI uri = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/{id}").buildAndExpand(newUser.getId()).toUri();
+        return ResponseEntity.created(uri).build();
     }
 
     // DELETE ------------------------------------------------------------------

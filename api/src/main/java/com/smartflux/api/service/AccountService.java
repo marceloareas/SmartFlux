@@ -60,7 +60,6 @@ public class AccountService {
 
     @Transactional
     public Account updateAccount(UUID id, Account account) {
-        //O hibernate já faz o update automático por causa do @Transactional
         Account newAccount = findAccountById(id);
 
         newAccount.setName(account.getName());

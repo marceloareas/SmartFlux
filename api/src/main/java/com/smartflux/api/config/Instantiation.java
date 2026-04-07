@@ -4,11 +4,13 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Configuration;
 
 import com.smartflux.api.model.Account;
+import com.smartflux.api.model.Category;
 import com.smartflux.api.model.User;
 import com.smartflux.api.model.enums.Currency;
+import com.smartflux.api.model.enums.TransactionType;
 import com.smartflux.api.repository.AccountRepository;
+import com.smartflux.api.repository.CategoryRepository;
 import com.smartflux.api.repository.UserRepository;
-
 
 import lombok.RequiredArgsConstructor;
 
@@ -17,13 +19,15 @@ import lombok.RequiredArgsConstructor;
 public class Instantiation implements CommandLineRunner {
 
         private final AccountRepository accountRepository;
+        private final CategoryRepository categoryRepository;
         private final UserRepository userRepository;
-        
+
         @Override
         public void run(String... args) throws Exception {
 
-                //Deletar sempre na ordem inversa da criação
+                // Deletar sempre na ordem inversa da criação
                 accountRepository.deleteAll();
+                categoryRepository.deleteAll();
                 userRepository.deleteAll();
 
                 // USER ------------------------------------------
@@ -39,7 +43,9 @@ public class Instantiation implements CommandLineRunner {
                 accountRepository.save(a1);
 
                 // CATEGORY ------------------------------------------
+                Category c1 = new Category(u1, "Alimentação", TransactionType.EXPENSE, "#26c226ff", "fastfood");
 
+                categoryRepository.save(c1);
 
                 // TRANSACTION ------------------------------------------
         }
