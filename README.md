@@ -54,6 +54,35 @@ A separação básica de contêineres inclui:
 
 ---
 
+## Como Executar (Docker)
+
+O projeto está totalmente conteinerizado sob um único arquivo `docker-compose.yml` que sobe todo o ecossistema necessário:
+
+1. Certifique-se de que possui o **Docker** e o **Docker Compose** instalados na sua máquina.
+2. Abra o terminal na raiz do projeto (onde está o arquivo `docker-compose.yml`).
+3. Execute o comando abaixo para realizar o *build* limpo e subir os serviços em segundo plano:
+   ```bash
+   docker-compose up -d --build
+   ```
+
+Aguarde o download e a compilação (pode levar alguns minutos na primeira execução). Assim que o processo concluir, o sistema estará acessível nas seguintes portas:
+
+- **Frontend (Interface Web):** [http://localhost:3000](http://localhost:3000)
+- **Backend (API Spring Boot):** [http://localhost:8080](http://localhost:8080)
+- **Banco de Dados (PostgreSQL):** Porta `5432`
+
+Para verificar os avisos da aplicação em tempo real, use:
+```bash
+docker-compose logs -f
+```
+
+Para interromper de forma segura todos os containers:
+```bash
+docker-compose down
+```
+
+---
+
 ## Licença
 
 Este projeto é distribuído sob a licença **MIT**. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.

@@ -2,6 +2,7 @@ package com.smartflux.api.service;
 
 import java.util.List;
 import java.util.UUID;
+import java.time.LocalDateTime;
 
 import org.springframework.stereotype.Service;
 
@@ -11,7 +12,9 @@ import com.smartflux.api.service.exceptionsCustom.ResourceNotFoundException;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RequiredArgsConstructor
 @Service
 public class TransactionService {
@@ -29,7 +32,11 @@ public class TransactionService {
 
     @Transactional
     public Transaction insertTransaction(Transaction transaction) {
-        return transactionRepository.save(transaction);
+        transaction.setCreatedAt(LocalDateTime.now());
+        transaction.setUpdatedAt(LocalDateTime.now());
+        Transaction saved = transactionRepository.save(transaction);
+        log.info("Transação salva com sucesso no banco de dados. ID: {}", saved.getId());
+        return saved;
     }
 
     @Transactional
@@ -48,7 +55,10 @@ public class TransactionService {
         transaction.setType(transactionDetails.getType());
         transaction.setDate(transactionDetails.getDate());
         transaction.setDescription(transactionDetails.getDescription());
+        transaction.setUpdatedAt(LocalDateTime.now());
 
-        return transactionRepository.save(transaction);
+        Transaction result = transactionRepository.save(transaction);
+        log.info("Transação atualizada com sucesso no banco de dados. ID: {}", result.getId());
+        return result;
     }
 }
