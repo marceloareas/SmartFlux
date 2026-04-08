@@ -10,6 +10,7 @@ import com.smartflux.api.model.enums.Currency;
 import com.smartflux.api.model.enums.TransactionType;
 import com.smartflux.api.repository.AccountRepository;
 import com.smartflux.api.repository.CategoryRepository;
+import com.smartflux.api.repository.TransactionRepository;
 import com.smartflux.api.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -20,12 +21,14 @@ public class Instantiation implements CommandLineRunner {
 
         private final AccountRepository accountRepository;
         private final CategoryRepository categoryRepository;
+        private final TransactionRepository transactionRepository;
         private final UserRepository userRepository;
 
         @Override
         public void run(String... args) throws Exception {
 
                 // Deletar sempre na ordem inversa da criação
+                transactionRepository.deleteAll();
                 accountRepository.deleteAll();
                 categoryRepository.deleteAll();
                 userRepository.deleteAll();

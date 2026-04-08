@@ -20,7 +20,9 @@ import com.smartflux.api.service.TransactionService;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RestController
 @RequestMapping("/transactions")
 @RequiredArgsConstructor
@@ -43,6 +45,7 @@ public class TransactionController {
 
     @PostMapping
     public ResponseEntity<Void> insertTransaction(@RequestBody Transaction transaction) {
+        log.info("Recebendo requisição para inserir nova transação: {}", transaction);
         Transaction newTransaction = transactionService.insertTransaction(transaction);
         URI uri = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{id}").buildAndExpand(newTransaction.getId()).toUri();
@@ -57,6 +60,7 @@ public class TransactionController {
 
     @PutMapping("/{id}")
     public ResponseEntity<Transaction> updateTransaction(@PathVariable UUID id, @RequestBody Transaction transaction) {
+        log.info("Recebendo requisição para atualizar transação ID {}: {}", id, transaction);
         Transaction updatedTransaction = transactionService.updateTransaction(id, transaction);
         return ResponseEntity.ok().body(updatedTransaction);
     }
