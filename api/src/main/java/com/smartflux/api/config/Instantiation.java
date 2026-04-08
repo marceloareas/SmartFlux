@@ -7,7 +7,6 @@ import com.smartflux.api.model.Account;
 import com.smartflux.api.model.Category;
 import com.smartflux.api.model.User;
 import com.smartflux.api.model.enums.Currency;
-import com.smartflux.api.model.enums.TransactionType;
 import com.smartflux.api.repository.AccountRepository;
 import com.smartflux.api.repository.CategoryRepository;
 import com.smartflux.api.repository.TransactionRepository;
@@ -46,7 +45,7 @@ public class Instantiation implements CommandLineRunner {
                 accountRepository.save(a1);
 
                 // CATEGORY ------------------------------------------
-                Category c1 = new Category(u1, "Alimentação", TransactionType.EXPENSE, "#26c226ff", "fastfood");
+                Category c1 = new Category(u1, "Alimentação", "#26c226ff");
 
                 categoryRepository.save(c1);
 

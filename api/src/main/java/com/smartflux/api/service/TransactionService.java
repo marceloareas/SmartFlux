@@ -52,8 +52,6 @@ public class TransactionService {
         transaction.setAccount(transactionDetails.getAccount());
         transaction.setCategory(transactionDetails.getCategory());
         transaction.setAmount(transactionDetails.getAmount());
-        transaction.setType(transactionDetails.getType());
-        transaction.setDate(transactionDetails.getDate());
         transaction.setDescription(transactionDetails.getDescription());
         transaction.setUpdatedAt(LocalDateTime.now());
 
