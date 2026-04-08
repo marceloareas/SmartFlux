@@ -3,6 +3,8 @@ package com.smartflux.api.model;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -12,18 +14,12 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
+import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.Getter;
-import lombok.ToString;
 
-@Setter
-@Getter
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode
-@ToString
+@Data
 @Entity
 @Table(name = "users")
 public class User {
@@ -43,11 +39,13 @@ public class User {
     @Column(nullable = false)
     private String timezone = "America/Sao_Paulo";
 
-    @Column(nullable = false, name = "created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @Column(nullable = false, name = "created_at",updatable = false)
+    @CreationTimestamp
+    private LocalDateTime createdAt;
 
     @Column(nullable = false, name = "updated_at")
-    private LocalDateTime updatedAt = LocalDateTime.now();
+    @UpdateTimestamp
+    private LocalDateTime updatedAt;
 
     public User(String name, String email, String passwordHash, String timezone) {
         this.name = name;

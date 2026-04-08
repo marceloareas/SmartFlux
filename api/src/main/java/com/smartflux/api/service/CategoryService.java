@@ -43,9 +43,7 @@ public class CategoryService {
         Category category = findCategoryById(id);
 
         category.setName(categoryDetails.getName());
-        category.setType(categoryDetails.getType());
         category.setColor(categoryDetails.getColor());
-        category.setIcon(categoryDetails.getIcon());
         category.setActive(categoryDetails.getActive());
 
         return categoryRepository.save(category);
