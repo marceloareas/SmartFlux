@@ -24,8 +24,8 @@ export default function Component() {
   const [newCatColor, setNewCatColor] = useState('#5EC4A7');
   const [selectedCategory, setSelectedCategory] = useState('');
 
-  const [categories, setCategories] = useState([]);
-  const [txs, setTxs] = useState([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [txs, setTxs] = useState<any[]>([]);
   const [account, setAccount] = useState<any>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
   
@@ -57,7 +57,7 @@ export default function Component() {
       const res = await fetch('/api/transactions');
       const data = await res.json();
       
-      data.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      data.sort((a: any, b: any) => new Date(b.competenceDate).getTime() - new Date(a.competenceDate).getTime());
       
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -67,7 +67,7 @@ export default function Component() {
       let total = 0;
       
       data.forEach((t: any) => {
-        const d = new Date(t.date);
+        const d = new Date(t.competenceDate);
         const isPending = d > today;
         const monthName = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
         const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
@@ -77,7 +77,7 @@ export default function Component() {
           currentMonth = monthName;
         }
         
-        const isDebit = t.type === 'EXPENSE';
+        const isDebit = t.direction === false;
         
         if (!isPending) {
           if (isDebit) total -= t.amount;
@@ -92,7 +92,7 @@ export default function Component() {
           rawAmount: t.amount,
           category: t.category ? t.category.name : null,
           categoryId: t.category ? t.category.id : null,
-          dateObj: t.date,
+          dateObj: t.competenceDate,
           date: d.toLocaleDateString('pt-BR'),
           desc: t.description,
           isPending: isPending,
@@ -145,8 +145,9 @@ export default function Component() {
       account: { id: account.id },
       category: selectedCategory && selectedCategory !== '__new__' ? { id: selectedCategory } : null,
       amount: parseFloat(sheetAmount),
-      type: direction === 'debit' ? 'EXPENSE' : 'INCOME',
-      date: sheetDate + "T00:00:00",
+      direction: direction === 'credit',
+      competenceDate: sheetDate + "T00:00:00",
+      status: 1,
       description: sheetDesc
     };
     
@@ -183,9 +184,7 @@ export default function Component() {
     const newCatObj = {
       user: { id: currentUser.id },
       name: newCatName.trim(),
-      type: direction === 'debit' ? 'EXPENSE' : 'INCOME',
-      color: newCatColor,
-      icon: newCatName.trim().charAt(0).toUpperCase()
+      color: newCatColor
     };
     
     try {

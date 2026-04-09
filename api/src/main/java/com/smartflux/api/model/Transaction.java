@@ -70,11 +70,15 @@ public class Transaction {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
-    public Transaction(Account account, Category category, BigDecimal amount, LocalDateTime date,
-            String description) { // TODO: adicionar novos atributos nesse construtor
+    public Transaction(Account account, Category category, Boolean direction, BigDecimal amount, String description,
+            LocalDateTime competenceDate, LocalDateTime dueDate, int status) {
         this.account = account;
         this.category = category;
+        this.direction = direction;
         this.amount = amount;
         this.description = description;
+        this.competenceDate = competenceDate;
+        this.dueDate = dueDate;
+        this.status = status;
     }
 }

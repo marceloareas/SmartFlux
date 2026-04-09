@@ -3,6 +3,7 @@ package com.smartflux.api.model;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.GeneratedValue;
@@ -28,7 +29,7 @@ public class Session {
     private UUID id;
 
     @ManyToOne
-    @Column(nullable = false, name = "user_id")
+    @JoinColumn(nullable = false, name = "user_id")
     private User user;
 
     @Column(nullable = false, name = "refresh_token_hash")
@@ -48,5 +49,5 @@ public class Session {
     private LocalDateTime createdAt;
 
     @Column(nullable = false, name = "expires_at")
-    private LocalDateTime expiresAt = createdAt.plusDays(30);
+    private LocalDateTime expiresAt = LocalDateTime.now().plusDays(30);
 }
