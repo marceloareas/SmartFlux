@@ -7,6 +7,8 @@ import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.smartflux.api.config.JWTUserData;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -30,6 +32,13 @@ public class UserController {
     private final UserService userService;
 
     // GET ------------------------------------------------------------------
+    @GetMapping("/me")
+    public ResponseEntity<User> findCurrentUser() {
+        JWTUserData userData = (JWTUserData) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        User user = userService.findUserById(UUID.fromString(userData.userId()));
+        return ResponseEntity.ok().body(user);
+    }
+
     @GetMapping
     public ResponseEntity<List<User>> findAllUser() {
         List<User> users = userService.findAllUser();
@@ -64,5 +73,5 @@ public class UserController {
         User user2 = userService.updateUser(id, user);
         return ResponseEntity.ok().body(user2);
     }
-    
+
 }

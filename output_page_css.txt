@@ -413,13 +413,3 @@ html, body {
   border-color:#fff;transform:scale(1.15);
   box-shadow:0 0 0 2px rgba(255,255,255,0.25);
 }
-
-/* Override autofill default styles to match dark theme */
-input:-webkit-autofill,
-input:-webkit-autofill:hover, 
-input:-webkit-autofill:focus, 
-input:-webkit-autofill:active{
-    -webkit-box-shadow: 0 0 0 30px var(--surface2) inset !important;
-    -webkit-text-fill-color: var(--text) !important;
-    transition: background-color 5000s ease-in-out 0s;
-}

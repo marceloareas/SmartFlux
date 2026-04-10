@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import './page.css';
+import { fetchApi } from "../lib/api";
 
 export default function Component() {
   const [activeTab, setActiveTab] = useState(1);
@@ -39,11 +40,11 @@ export default function Component() {
     return `rgba(${r},${g},${b},${a})`;
   };
 
-  const fetchCategories = async () => {
+  const fetchCategories = async (uid: string) => {
     try {
-      const res = await fetch('/api/categories');
+      const res = await fetchApi('/api/categories');
       const data = await res.json();
-      setCategories(data.map((c: any) => ({
+      setCategories(data.filter((c: any) => c.user?.id === uid).map((c: any) => ({
         value: c.id,
         label: c.name,
         color: c.color,
@@ -52,12 +53,13 @@ export default function Component() {
     } catch(e) { console.error('Error fetching categories:', e); }
   };
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = async (accId: string) => {
     try {
-      const res = await fetch('/api/transactions');
+      const res = await fetchApi('/api/transactions');
       const data = await res.json();
       
-      data.sort((a: any, b: any) => new Date(b.competenceDate).getTime() - new Date(a.competenceDate).getTime());
+      const myTxs = data.filter((t: any) => t.account?.id === accId);
+      myTxs.sort((a: any, b: any) => new Date(b.competenceDate).getTime() - new Date(a.competenceDate).getTime());
       
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -66,7 +68,7 @@ export default function Component() {
       const grouped: any[] = [];
       let total = 0;
       
-      data.forEach((t: any) => {
+      myTxs.forEach((t: any) => {
         const d = new Date(t.competenceDate);
         const isPending = d > today;
         const monthName = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
@@ -108,18 +110,23 @@ export default function Component() {
   };
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && (!localStorage.getItem('accessToken') || !localStorage.getItem('refreshToken'))) {
+      window.location.href = '/login';
+      return;
+    }
     const loadData = async () => {
       try {
-        const usersRes = await fetch('/api/users');
-        const users = await usersRes.json();
-        if (users.length > 0) setCurrentUser(users[0]);
+        const usersRes = await fetchApi('/api/users/me');
+        const user = await usersRes.json();
+        if (user && user.id) setCurrentUser(user);
 
-        const accRes = await fetch('/api/accounts');
+        const accRes = await fetchApi('/api/accounts');
         const accs = await accRes.json();
-        if (accs.length > 0) setAccount(accs[0]);
+        const myAcc = accs.find((a: any) => a.user?.id === user.id);
+        if (myAcc) setAccount(myAcc);
         
-        await fetchCategories();
-        await fetchTransactions();
+        await fetchCategories(user.id);
+        if (myAcc) await fetchTransactions(myAcc.id);
       } catch (err) {
         console.error(err);
       }
@@ -153,28 +160,28 @@ export default function Component() {
     
     try {
       if (sheetMode === 'add') {
-        await fetch('/api/transactions', {
+        await fetchApi('/api/transactions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(transaction)
         });
       } else {
-        await fetch(`/api/transactions/${editingId}`, {
+        await fetchApi(`/api/transactions/${editingId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(transaction)
         });
       }
       setSheetOpen(false);
-      fetchTransactions();
+      if (account) fetchTransactions(account.id);
     } catch(e) { console.error("Error saving tx", e); }
   };
 
   const handleDeleteTx = async () => {
     try {
-      await fetch(`/api/transactions/${editingId}`, { method: 'DELETE' });
+      await fetchApi(`/api/transactions/${editingId}`, { method: 'DELETE' });
       setConfirmOpen(false);
-      fetchTransactions();
+      if (account) fetchTransactions(account.id);
     } catch(e) { console.error("Error deleting tx", e); }
   };
 
@@ -188,12 +195,12 @@ export default function Component() {
     };
     
     try {
-      const res = await fetch('/api/categories', {
+      const res = await fetchApi('/api/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newCatObj)
       });
-      await fetchCategories();
+      await fetchCategories(currentUser.id);
       const loc = res.headers.get('Location');
       if (loc) {
         const id = loc.substring(loc.lastIndexOf('/') + 1);
@@ -243,7 +250,7 @@ export default function Component() {
               </div>
               <span className="logo-name">SmartFlux</span>
             </div>
-            <div className="avatar-btn">
+            <div className="avatar-btn" onClick={() => window.location.href="/profile"}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
             </div>
           </div>
