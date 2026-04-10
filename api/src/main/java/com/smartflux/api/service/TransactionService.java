@@ -32,8 +32,7 @@ public class TransactionService {
 
     @Transactional
     public Transaction insertTransaction(Transaction transaction) {
-        transaction.setCreatedAt(LocalDateTime.now());
-        transaction.setUpdatedAt(LocalDateTime.now());
+        transaction.setId(null);
         Transaction saved = transactionRepository.save(transaction);
         log.info("Transação salva com sucesso no banco de dados. ID: {}", saved.getId());
         return saved;

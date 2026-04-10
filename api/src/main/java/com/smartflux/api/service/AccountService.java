@@ -34,6 +34,7 @@ public class AccountService {
     // POST ------------------------------------------------------------------
 
     public Account insertAccount(Account account) {
+        account.setId(null);
         Account newAccount = new Account();
         newAccount.setUser(account.getUser());
         newAccount.setName(account.getName());
@@ -45,6 +46,7 @@ public class AccountService {
     // Método auxiliar para criar conta padrão
     public Account createDefaultAccount(User user) {
         Account account = new Account();
+        account.setId(null); 
         account.setUser(user);
         account.setName("Conta Padrão");
         return accountRepository.save(account);
