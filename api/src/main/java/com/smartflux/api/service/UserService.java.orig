@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.smartflux.api.model.User;
 import com.smartflux.api.repository.UserRepository;
@@ -20,7 +19,6 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final AccountService accountService;
-    private final PasswordEncoder passwordEncoder;
 
     public List<User> findAllUser() {
         List<User> users = userRepository.findAll();
@@ -63,11 +61,7 @@ public class UserService {
 
         newUser.setName(user.getName());
         newUser.setEmail(user.getEmail());
-        if (user.getPasswordHash() != null && !user.getPasswordHash().isEmpty()) {
-            if (!user.getPasswordHash().startsWith("$2a$")) {
-                newUser.setPasswordHash(passwordEncoder.encode(user.getPasswordHash()));
-            }
-        }
+        newUser.setPasswordHash(user.getPasswordHash());
         newUser.setTimezone(user.getTimezone());
         newUser.setUpdatedAt(LocalDateTime.now());
 

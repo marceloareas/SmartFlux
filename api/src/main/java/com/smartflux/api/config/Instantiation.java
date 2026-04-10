@@ -14,6 +14,7 @@ import com.smartflux.api.model.enums.Currency;
 import com.smartflux.api.repository.AccountRepository;
 import com.smartflux.api.repository.CategoryRepository;
 import com.smartflux.api.repository.TransactionRepository;
+import com.smartflux.api.repository.SessionRepository;
 import com.smartflux.api.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -26,11 +27,13 @@ public class Instantiation implements CommandLineRunner {
         private final AccountRepository accountRepository;
         private final CategoryRepository categoryRepository;
         private final TransactionRepository transactionRepository;
+        private final SessionRepository sessionRepository;
         private final UserRepository userRepository;
         private final PasswordEncoder passwordEncoder;
 
         @Override
         public void run(String... args) throws Exception {
+                sessionRepository.deleteAll();
 
                 // Deletar sempre na ordem inversa da criação
                 transactionRepository.deleteAll();
