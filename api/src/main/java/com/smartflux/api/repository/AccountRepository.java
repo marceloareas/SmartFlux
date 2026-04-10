@@ -7,7 +7,12 @@ import org.springframework.stereotype.Repository;
 
 import com.smartflux.api.model.Account;
 
+import java.util.List;
+import java.util.Optional;
+
 @Repository
 public interface AccountRepository extends JpaRepository<Account, UUID> {
-    
+    List<Account> findByUserId(UUID userId);
+
+    Optional<Account> findByIdAndUserId(UUID id, UUID userId);
 }

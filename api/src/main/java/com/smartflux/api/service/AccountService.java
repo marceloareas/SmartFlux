@@ -2,6 +2,9 @@ package com.smartflux.api.service;
 
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.smartflux.api.config.JWTUserData;
+import com.smartflux.api.service.exceptionsCustom.ResourceNotFoundException;
 
 import org.springframework.stereotype.Service;
 
@@ -16,17 +19,21 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @Service
 public class AccountService {
+    private UUID getCurrentUserId() {
+        JWTUserData userData = (JWTUserData) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return UUID.fromString(userData.userId());
+    }
 
     private final AccountRepository accountRepository;
 
     // GET ------------------------------------------------------------------
     public List<Account> findAllAccount() {
-        List<Account> listAccounts = accountRepository.findAll();
+        List<Account> listAccounts = accountRepository.findByUserId(getCurrentUserId());
         return listAccounts;
     }
 
     public Account findAccountById(UUID id) {
-        Account account = accountRepository.findById(id)
+        Account account = accountRepository.findByIdAndUserId(id, getCurrentUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("Conta não encontrada"));
         return account;
     }
@@ -36,7 +43,9 @@ public class AccountService {
     public Account insertAccount(Account account) {
         account.setId(null);
         Account newAccount = new Account();
-        newAccount.setUser(account.getUser());
+        User currentUser = new User();
+        currentUser.setId(getCurrentUserId());
+        newAccount.setUser(currentUser);
         newAccount.setName(account.getName());
         newAccount.setColor(account.getColor());
         newAccount.setCurrency(account.getCurrency());
@@ -46,7 +55,7 @@ public class AccountService {
     // Método auxiliar para criar conta padrão
     public Account createDefaultAccount(User user) {
         Account account = new Account();
-        account.setId(null); 
+        account.setId(null);
         account.setUser(user);
         account.setName("Conta Padrão");
         return accountRepository.save(account);
