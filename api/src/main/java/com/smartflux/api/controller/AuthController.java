@@ -1,25 +1,27 @@
 package com.smartflux.api.controller;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.smartflux.api.dto.request.LoginRequest;
+import com.smartflux.api.dto.request.RegisterRequest;
 import com.smartflux.api.dto.response.LoginResponse;
+import com.smartflux.api.dto.response.RegisterResponse;
 import com.smartflux.api.model.User;
-import com.smartflux.api.service.AuthService;
 import com.smartflux.api.service.UserService;
-
-import java.util.UUID;
-
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import com.smartflux.api.config.TokenConfig;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -29,32 +31,36 @@ import lombok.RequiredArgsConstructor;
 @Tag(name = "Autenticação", description = "Endpoints de autenticação")
 public class AuthController {
 
-    private final AuthService authService;
     private final UserService userService;
+    private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
+    private final TokenConfig tokenConfig;
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
-        String token = authService.authLogin(request);
-        User user = userService.findUserByEmail(request.email());
-        return ResponseEntity.ok(new LoginResponse(token, user.getId().toString(), user.getEmail()));
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest loginRequest) {
+        //Autenticar usuário pela senha e pelo email.
+        //Pega a senha do usuário no banco de dados e compara com a senha enviada pelo usuário.
+        //Se a senha for igual, gera um token e retorna para o usuário.
+        //Se a senha for diferente, retorna um erro.
+
+        UsernamePasswordAuthenticationToken userAndPass = new UsernamePasswordAuthenticationToken(loginRequest.email(), loginRequest.password());
+        Authentication authentication = authenticationManager.authenticate(userAndPass);
+
+        User user = (User) authentication.getPrincipal(); //Pega o usuário autenticado
+        String token = tokenConfig.generateToken(user); //Gera o token
+
+        return ResponseEntity.ok(new LoginResponse(token));
     }
 
-    @GetMapping("/me/{token}")
-    public ResponseEntity<LoginResponse> me(@PathVariable String token) {
-        try {
-            UUID id = UUID.fromString(token);
-            User user = userService.findUserById(id);
+    @PostMapping("/register")
+    public ResponseEntity<RegisterResponse> register(@Valid @RequestBody RegisterRequest registerRequest) {
+        User newUser = new User(); //Já cria um ID
+        newUser.setName(registerRequest.name());
+        newUser.setEmail(registerRequest.email());
+        newUser.setPasswordHash(passwordEncoder.encode(registerRequest.password()));
 
-            if (user == null) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-            }
-
-            return ResponseEntity.ok(new LoginResponse(
-                    token,
-                    user.getId().toString(),
-                    user.getEmail()));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
-        }
+        userService.insertUser(newUser);
+        
+        return ResponseEntity.status(HttpStatus.CREATED).body(new RegisterResponse(newUser.getName(), newUser.getEmail()));
     }
 }

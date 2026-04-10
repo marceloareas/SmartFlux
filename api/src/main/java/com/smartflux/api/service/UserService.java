@@ -33,27 +33,19 @@ public class UserService {
     }
 
     public User findUserByEmail(String email) {
-        User user = userRepository.findByEmail(email);
-        if (user == null) {
-            throw new ResourceNotFoundException("Usuário não encontrado");
-        }
+        User user = (User) userRepository.findUserByEmail(email).orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
         return user;
     }
 
     // POST ------------------------------------------------------------------
     @Transactional
-    public User insertUser(User user) {
-        User newUser = new User();
-        newUser.setName(user.getName());
-        newUser.setEmail(user.getEmail());
-        newUser.setPasswordHash(user.getPasswordHash());
-        newUser.setTimezone(user.getTimezone());
+    public User insertUser(User newUser) {
 
-        userRepository.save(newUser);//Salva o usuario no banco (gera um id)
+        User userSaved = userRepository.save(newUser);//Salva o usuario no banco (gera um id)
 
-        accountService.createDefaultAccount(newUser);//Pega o id criado e cria a conta padrão
+        accountService.createDefaultAccount(userSaved);//Pega o id criado e cria a conta padrão
 
-        return newUser;
+        return userSaved;
     }
 
     // DELETE ------------------------------------------------------------------
