@@ -29,6 +29,7 @@ public class CategoryService {
 
     @Transactional
     public Category insertCategory(Category category) {
+        category.setId(null);
         return categoryRepository.save(category);
     }
 

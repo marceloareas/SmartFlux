@@ -40,7 +40,7 @@ public class UserService {
     // POST ------------------------------------------------------------------
     @Transactional
     public User insertUser(User newUser) {
-
+        newUser.setId(null);
         User userSaved = userRepository.save(newUser);//Salva o usuario no banco (gera um id)
 
         accountService.createDefaultAccount(userSaved);//Pega o id criado e cria a conta padrão
