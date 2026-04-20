@@ -25,11 +25,19 @@ export default function Login() {
                 body: JSON.stringify({ email, password }),
             });
 
-            const data = await res.json();
-
             if (!res.ok) {
-                throw new Error(data.message || 'Erro ao realizar login');
+                // Tenta extrair a mensagem de erro da API
+                let errorMessage = 'Email ou senha inválidos.';
+                try {
+                    const data = await res.json();
+                    if (data.message) errorMessage = data.message;
+                } catch (e) {
+                    // Se não houver JSON, usamos o fallback
+                }
+                throw new Error(errorMessage);
             }
+
+            const data = await res.json();
 
             // Salva os tokens na localStorage
             localStorage.setItem('accessToken', data.accessToken);

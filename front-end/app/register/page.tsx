@@ -12,9 +12,21 @@ export default function Register() {
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
+    const hasMinLength = password.length >= 6;
+    const hasUpper = /[A-Z]/.test(password);
+    const hasLower = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const isValidPassword = hasMinLength && hasUpper && hasLower && hasNumber;
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
+
+        if (!isValidPassword) {
+            setError('A senha não atende aos requisitos mínimos.');
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -26,10 +38,13 @@ export default function Register() {
                 body: JSON.stringify({ name, email, password }),
             });
 
-            const data = await res.json();
-
             if (!res.ok) {
-                throw new Error(data.message || 'Erro ao realizar cadastro');
+                let errorMessage = 'Erro ao realizar cadastro. Tente outro e-mail.';
+                try {
+                    const data = await res.json();
+                    if (data.message) errorMessage = data.message;
+                } catch (e) { }
+                throw new Error(errorMessage);
             }
 
             // Redireciona para login após cadastro
@@ -97,8 +112,25 @@ export default function Register() {
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
                                         required
-                                        minLength={6}
                                     />
+                                    <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11px', fontWeight: 600 }}>
+                                        <div style={{ color: hasMinLength ? 'var(--credit)' : 'var(--text-3)', display: 'flex', alignItems: 'center', gap: '4px', transition: 'color 0.2s' }}>
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                            mínimo de 6 caracteres
+                                        </div>
+                                        <div style={{ color: hasUpper ? 'var(--credit)' : 'var(--text-3)', display: 'flex', alignItems: 'center', gap: '4px', transition: 'color 0.2s' }}>
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                            uma letra maiúscula
+                                        </div>
+                                        <div style={{ color: hasLower ? 'var(--credit)' : 'var(--text-3)', display: 'flex', alignItems: 'center', gap: '4px', transition: 'color 0.2s' }}>
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                            uma letra minúscula
+                                        </div>
+                                        <div style={{ color: hasNumber ? 'var(--credit)' : 'var(--text-3)', display: 'flex', alignItems: 'center', gap: '4px', transition: 'color 0.2s' }}>
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                            um número
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {error && (
