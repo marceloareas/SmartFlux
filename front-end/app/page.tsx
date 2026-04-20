@@ -19,6 +19,7 @@ export default function Component() {
   const [editingId, setEditingId] = useState<any>(null);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
 
   const [newCatOpen, setNewCatOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
@@ -29,7 +30,7 @@ export default function Component() {
   const [txs, setTxs] = useState<any[]>([]);
   const [account, setAccount] = useState<any>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  
+
   const [flowTotal, setFlowTotal] = useState(0);
 
   const hexToRgba = (hex: string, a: number) => {
@@ -50,42 +51,42 @@ export default function Component() {
         color: c.color,
         icon: c.icon
       })));
-    } catch(e) { console.error('Error fetching categories:', e); }
+    } catch (e) { console.error('Error fetching categories:', e); }
   };
 
   const fetchTransactions = async (accId: string) => {
     try {
       const res = await fetchApi('/api/transactions');
       const data = await res.json();
-      
+
       const myTxs = data.filter((t: any) => t.account?.id === accId);
       myTxs.sort((a: any, b: any) => new Date(b.competenceDate).getTime() - new Date(a.competenceDate).getTime());
-      
+
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
       let currentMonth = '';
       const grouped: any[] = [];
       let total = 0;
-      
+
       myTxs.forEach((t: any) => {
         const d = new Date(t.competenceDate);
         const isPending = d > today;
         const monthName = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
         const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-        
+
         if (monthName !== currentMonth) {
           grouped.push({ type: 'month', label: capitalizedMonth });
           currentMonth = monthName;
         }
-        
+
         const isDebit = t.direction === false;
-        
+
         if (!isPending) {
           if (isDebit) total -= t.amount;
           else total += t.amount;
         }
-        
+
         grouped.push({
           id: t.id,
           type: 'tx',
@@ -103,10 +104,10 @@ export default function Component() {
           bg: hexToRgba(t.category?.color, 0.18)
         });
       });
-      
+
       setTxs(grouped as any);
       setFlowTotal(total);
-    } catch(e) { console.error('Error fetching txs:', e); }
+    } catch (e) { console.error('Error fetching txs:', e); }
   };
 
   useEffect(() => {
@@ -124,7 +125,7 @@ export default function Component() {
         const accs = await accRes.json();
         const myAcc = accs.find((a: any) => a.user?.id === user.id);
         if (myAcc) setAccount(myAcc);
-        
+
         await fetchCategories(user.id);
         if (myAcc) await fetchTransactions(myAcc.id);
       } catch (err) {
@@ -146,8 +147,8 @@ export default function Component() {
   }, []);
 
   const handleSaveTx = async () => {
-    if(!account || !sheetAmount) return;
-    
+    if (!account || !sheetAmount) return;
+
     const transaction = {
       account: { id: account.id },
       category: selectedCategory && selectedCategory !== '__new__' ? { id: selectedCategory } : null,
@@ -157,7 +158,7 @@ export default function Component() {
       status: 1,
       description: sheetDesc
     };
-    
+
     try {
       if (sheetMode === 'add') {
         await fetchApi('/api/transactions', {
@@ -174,7 +175,7 @@ export default function Component() {
       }
       setSheetOpen(false);
       if (account) fetchTransactions(account.id);
-    } catch(e) { console.error("Error saving tx", e); }
+    } catch (e) { console.error("Error saving tx", e); }
   };
 
   const handleDeleteTx = async () => {
@@ -182,18 +183,18 @@ export default function Component() {
       await fetchApi(`/api/transactions/${editingId}`, { method: 'DELETE' });
       setConfirmOpen(false);
       if (account) fetchTransactions(account.id);
-    } catch(e) { console.error("Error deleting tx", e); }
+    } catch (e) { console.error("Error deleting tx", e); }
   };
 
   const handleCreateCategory = async () => {
-    if(!newCatName.trim() || !currentUser) return;
-    
+    if (!newCatName.trim() || !currentUser) return;
+
     const newCatObj = {
       user: { id: currentUser.id },
       name: newCatName.trim(),
       color: newCatColor
     };
-    
+
     try {
       const res = await fetchApi('/api/categories', {
         method: 'POST',
@@ -208,7 +209,7 @@ export default function Component() {
       }
       setNewCatOpen(false);
       setNewCatName('');
-    } catch(e) { console.error("Error creating category", e); }
+    } catch (e) { console.error("Error creating category", e); }
   };
 
   const openAddSheet = () => {
@@ -234,6 +235,38 @@ export default function Component() {
     setSheetOpen(true);
   };
 
+  const getAnimalAvatar = (name: string) => {
+    const animals = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐧', '🦉', '🐺', '🐗', '🦄', '🐝', '🐛', '🦋', '🐢', '🐍', '🦖', '🦕', '🐙', '🦑', '🦀', '🐡', '🐠', '🐬', '🐳', '🦈', '🐊', '🐅', '🐆', '🦓', '🦍', '🐘', '🦛', '🦏', '🐫', '🦒', '🦘', '🦙', '🦝', '🦨', '🦡', '🦦', '🦥'];
+    if (!name) return '🐶';
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return animals[Math.abs(hash) % animals.length];
+  };
+
+  const handleExportCsv = async () => {
+    try {
+      const now = new Date();
+      // We pass the current month (1-12) and year
+      const month = now.getMonth() + 1;
+      const year = now.getFullYear();
+
+      const res = await fetchApi(`/api/transactions/export?month=${month}&year=${year}`);
+      const blob = await res.blob();
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio_transacoes_${month}_${year}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url); setExportMenuOpen(false);
+    } catch (e) {
+      console.error('Erro ao exportar CSV', e);
+      alert('Erro ao exportar o relatório');
+    }
+  };
+
   return (
     <>
       <div className="bg">
@@ -246,23 +279,61 @@ export default function Component() {
           <div className="topbar">
             <div className="logo">
               <div className="logo-mark">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#030D08" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="#030D08" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>
               </div>
               <span className="logo-name">SmartFlux</span>
             </div>
-            <div className="avatar-btn" onClick={() => window.location.href="/profile"}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+            <div className="avatar-btn" onClick={() => window.location.href = "/profile"} style={{ fontSize: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '50%', width: '36px', height: '36px', userSelect: 'none' }}>
+              {currentUser?.name ? getAnimalAvatar(currentUser.name) : '🐶'}
             </div>
           </div>
 
           <div className="screen">
-            <div className="page-header">
-              <div className="page-title">Transações</div>
-              <div className="flow-summary">
-                <span className="flow-label">Fluxo atual:</span>
-                <span className={`flow-value ${flowTotal >= 0 ? 'positive' : 'negative'}`}>
-                  R$ {Math.abs(flowTotal).toFixed(2).replace('.', ',')}
-                </span>
+            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div className="page-title">Transações</div>
+                <div className="flow-summary">
+                  <span className="flow-label">Fluxo atual:</span>
+                  <span className={`flow-value ${flowTotal >= 0 ? 'positive' : 'negative'}`}>
+                    R$ {Math.abs(flowTotal).toFixed(2).replace('.', ',')}
+                  </span>
+                </div>
+              </div>
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setExportMenuOpen(!exportMenuOpen)}
+                  style={{
+                    background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)',
+                    padding: '6px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '4px'
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  Exportar
+                </button>
+                {exportMenuOpen && (
+                  <div style={{
+                    position: 'absolute', top: '100%', right: 0, marginTop: '8px',
+                    background: 'var(--surface)', border: '1px solid var(--border)',
+                    borderRadius: '8px', padding: '4px', zIndex: 100, width: 'max-content',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                  }}>
+                    <div
+                      onClick={handleExportCsv}
+                      style={{ padding: '8px 12px', fontSize: '12px', color: 'var(--text)', cursor: 'pointer', borderRadius: '4px' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      Relatório Mensal (CSV)
+                    </div>
+                    <div
+                      style={{ padding: '8px 12px', fontSize: '12px', color: 'var(--text-3)', cursor: 'not-allowed', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', gap: '12px' }}
+                    >
+                      <span>Relatório Detalhado (PDF)</span>
+                      <span style={{ fontSize: '10px', background: 'var(--border)', padding: '1px 4px', borderRadius: '4px' }}>Beta</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -285,13 +356,13 @@ export default function Component() {
                   const fullIdx = txs.findIndex(x => x === t);
                   const nextMonthIdx = txs.slice(fullIdx + 1).findIndex(x => x.type === 'month');
                   const sectionTxs = txs.slice(fullIdx + 1, nextMonthIdx === -1 ? undefined : fullIdx + 1 + nextMonthIdx);
-                  
+
                   let show = false;
                   if (currentFilter === 'all') show = sectionTxs.some(x => x.type === 'tx' && !x.isPending);
                   else if (currentFilter === 'pending') show = sectionTxs.some(x => x.type === 'tx' && x.isPending);
                   else show = sectionTxs.some(x => x.type === 'tx' && x.dir === currentFilter && !x.isPending);
 
-                  if(!show) return null;
+                  if (!show) return null;
                   return <div key={`month-${t.label}`} className="month-label">{t.label}</div>;
                 }
                 return (
@@ -299,7 +370,7 @@ export default function Component() {
                     <div className="tx-card-icon" style={{ background: t.bg, color: t.color }}>{t.icon}</div>
                     <div className="tx-card-body">
                       <div className="tx-card-desc">{t.desc}</div>
-                      <div className="tx-card-meta">{t.category ? `${t.category} · ${t.date.slice(0,5)}` : `${t.date.slice(0,5)} · Sem categoria`}</div>
+                      <div className="tx-card-meta">{t.category ? `${t.category} · ${t.date.slice(0, 5)}` : `${t.date.slice(0, 5)} · Sem categoria`}</div>
                     </div>
                     <div className="tx-card-amount">{t.dir === 'debit' ? '- ' : '+ '}{t.amount.replace('R$ ', '')}</div>
                   </div>
@@ -310,33 +381,33 @@ export default function Component() {
 
           <div className="tabbar">
             <div className={`tab-item ${activeTab === 0 ? 'active' : ''}`} onClick={() => setActiveTab(0)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" /><path d="M9 21V12h6v9" /></svg>
               <span className="tab-label">Início</span>
             </div>
             <div className={`tab-item ${activeTab === 1 ? 'active' : ''}`} onClick={() => setActiveTab(1)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>
               <span className="tab-label">Transações</span>
             </div>
             <div className="tab-fab" onClick={openAddSheet}>
               <div className="fab-circle">
-                <svg viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
               </div>
               <span className="tab-label">Adicionar</span>
             </div>
             <div className={`tab-item ${activeTab === 2 ? 'active' : ''}`} onClick={() => setActiveTab(2)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
               <span className="tab-label">Futuro</span>
             </div>
             <div className={`tab-item ${activeTab === 3 ? 'active' : ''}`} onClick={() => setActiveTab(3)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
               <span className="tab-label">Relatórios</span>
             </div>
           </div>
 
-          <div className={`overlay-backdrop ${detailOpen ? 'open' : ''}`} onClick={(e) => { if(e.target === e.currentTarget) setDetailOpen(false); }}>
+          <div className={`overlay-backdrop ${detailOpen ? 'open' : ''}`} onClick={(e) => { if (e.target === e.currentTarget) setDetailOpen(false); }}>
             <div className={`detail-card ${detail.dir}`}>
               <div className="detail-close" onClick={() => setDetailOpen(false)}>
-                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M1 1l10 10M11 1L1 11"/></svg>
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M1 1l10 10M11 1L1 11" /></svg>
               </div>
               <div className="detail-amount">{detail.dir === 'debit' ? '- ' : '+ '}{detail.amount}</div>
               <div className="detail-rows">
@@ -354,17 +425,17 @@ export default function Component() {
                 </div>
               </div>
               <button className="detail-edit-btn" onClick={openEditSheet}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                 Editar transação
               </button>
             </div>
           </div>
 
-          <div className={`sheet-backdrop ${sheetOpen ? 'open' : ''}`} onClick={(e) => { if(e.target === e.currentTarget) setSheetOpen(false); }}>
+          <div className={`sheet-backdrop ${sheetOpen ? 'open' : ''}`} onClick={(e) => { if (e.target === e.currentTarget) setSheetOpen(false); }}>
             <div className="sheet">
               <div className="sheet-handle"></div>
               <div className="sheet-title">{sheetMode === 'add' ? 'Nova transação' : 'Editar transação'}</div>
-              
+
               <div className="dir-toggle">
                 <button className={`dir-btn ${direction === 'debit' ? 'active-debit' : ''}`} onClick={() => setDirection('debit')}>↓ Débito</button>
                 <div className="dir-separator"></div>
@@ -381,9 +452,9 @@ export default function Component() {
 
               <div className="field">
                 <label className="field-label">Categoria</label>
-                <div style={{position:'relative'}}>
-                  <select 
-                    value={selectedCategory} 
+                <div style={{ position: 'relative' }}>
+                  <select
+                    value={selectedCategory}
                     onChange={(e) => {
                       if (e.target.value === '__new__') setNewCatOpen(true);
                       else setSelectedCategory(e.target.value);
@@ -413,7 +484,7 @@ export default function Component() {
             </div>
           </div>
 
-          <div className={`sheet-backdrop ${confirmOpen ? 'open' : ''}`} onClick={(e) => { if(e.target === e.currentTarget) setConfirmOpen(false); }}>
+          <div className={`sheet-backdrop ${confirmOpen ? 'open' : ''}`} onClick={(e) => { if (e.target === e.currentTarget) setConfirmOpen(false); }}>
             <div className="confirm-box">
               <div className="confirm-title">Tem certeza?</div>
               <div className="confirm-body">Isso irá <strong>cancelar a transação</strong> permanentemente. O registro será mantido para auditoria, mas excluído de todos os cálculos. Isso não pode ser desfeito.</div>
@@ -424,7 +495,7 @@ export default function Component() {
             </div>
           </div>
 
-          <div className={`sheet-backdrop ${newCatOpen ? 'open' : ''}`} onClick={(e) => { if(e.target === e.currentTarget) setNewCatOpen(false); }}>
+          <div className={`sheet-backdrop ${newCatOpen ? 'open' : ''}`} onClick={(e) => { if (e.target === e.currentTarget) setNewCatOpen(false); }}>
             <div className="sheet">
               <div className="sheet-handle"></div>
               <div className="sheet-title">Nova categoria</div>
@@ -434,25 +505,25 @@ export default function Component() {
                 <input type="text" placeholder="ex: Combustível" value={newCatName} onChange={e => setNewCatName(e.target.value)} />
               </div>
 
-              <div style={{marginBottom:16}}>
-                <div className="field-label" style={{marginBottom:10}}>Cor</div>
-                <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
-                  {['#5EC4A7','#F5A623','#8A6EED','#37B9DD','#E8893C','#FF5C6A','#A78BFA','#34D399','#FB7185','#DC6450'].map(c => (
-                    <div key={c} className={`nc-swatch ${newCatColor === c ? 'active' : ''}`} style={{background: c}} onClick={() => setNewCatColor(c)}></div>
+              <div style={{ marginBottom: 16 }}>
+                <div className="field-label" style={{ marginBottom: 10 }}>Cor</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                  {['#5EC4A7', '#F5A623', '#8A6EED', '#37B9DD', '#E8893C', '#FF5C6A', '#A78BFA', '#34D399', '#FB7185', '#DC6450'].map(c => (
+                    <div key={c} className={`nc-swatch ${newCatColor === c ? 'active' : ''}`} style={{ background: c }} onClick={() => setNewCatColor(c)}></div>
                   ))}
                 </div>
               </div>
 
-              <div style={{display:'flex',alignItems:'center',gap:10,padding:'11px 13px',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',marginBottom:18}}>
-                <div style={{width:30,height:30,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'"Roboto",sans-serif',fontSize:12,fontWeight:700,background:hexToRgba(newCatColor, 0.18),color:newCatColor,flexShrink:0}}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 13px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', marginBottom: 18 }}>
+                <div style={{ width: 30, height: 30, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: '"Roboto",sans-serif', fontSize: 12, fontWeight: 700, background: hexToRgba(newCatColor, 0.18), color: newCatColor, flexShrink: 0 }}>
                   {newCatName ? newCatName[0].toUpperCase() : '#'}
                 </div>
-                <span style={{fontSize:13,fontWeight:600,color:newCatName?'var(--text)':'var(--text-2)'}}>{newCatName || 'Pré-visualização'}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: newCatName ? 'var(--text)' : 'var(--text-2)' }}>{newCatName || 'Pré-visualização'}</span>
               </div>
 
               <div className="sheet-actions">
                 <button className="btn btn-ghost" onClick={() => setNewCatOpen(false)}>Cancelar</button>
-                <button className="btn btn-primary" style={{flex:2}} onClick={handleCreateCategory}>Criar e selecionar</button>
+                <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleCreateCategory}>Criar e selecionar</button>
               </div>
             </div>
           </div>

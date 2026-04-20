@@ -3,6 +3,8 @@ package com.smartflux.api.service;
 import java.util.List;
 import java.util.UUID;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
 
 import org.springframework.security.core.context.SecurityContextHolder;
 import com.smartflux.api.config.JWTUserData;
@@ -81,5 +83,58 @@ public class TransactionService {
         Transaction result = transactionRepository.save(transaction);
         log.info("Transação atualizada com sucesso no banco de dados. ID: {}", result.getId());
         return result;
+    }
+
+    public String exportMonthlyReportAsCsv(int month, int year) {
+        YearMonth yearMonth = YearMonth.of(year, month);
+        LocalDateTime startOfMonth = yearMonth.atDay(1).atStartOfDay();
+        LocalDateTime endOfMonth = yearMonth.atEndOfMonth().atTime(23, 59, 59, 999999999);
+
+        List<Transaction> transactions = transactionRepository.findByAccountUserIdAndCompetenceDateBetween(
+                getCurrentUserId(), startOfMonth, endOfMonth);
+
+        StringBuilder csvBuilder = new StringBuilder();
+        // Cabeçalho do CSV
+        csvBuilder.append("ID,Data,Descrição,Conta,Categoria,Tipo,Valor,Status\n");
+
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+
+        for (Transaction t : transactions) {
+            String idStr = t.getId() != null ? t.getId().toString() : "";
+            String dateStr = t.getCompetenceDate() != null ? t.getCompetenceDate().format(dateFormatter) : "";
+
+            // Tratando vírgulas e aspas na descrição para não quebrar o CSV
+            String description = t.getDescription() != null ? t.getDescription().replace("\"", "\"\"") : "";
+            if (description.contains(",") || description.contains("\n")) {
+                description = "\"" + description + "\"";
+            }
+
+            String accountName = t.getAccount() != null && t.getAccount().getName() != null ? t.getAccount().getName()
+                    : "";
+            String categoryName = t.getCategory() != null && t.getCategory().getName() != null
+                    ? t.getCategory().getName()
+                    : "";
+
+            String direction = t.getDirection() != null && t.getDirection() ? "Receita" : "Despesa";
+            String amount = t.getAmount() != null ? t.getAmount().toString() : "0.00";
+
+            String status = "Desconhecido";
+            switch (t.getStatus()) {
+                case 0:
+                    status = "Pendente";
+                    break;
+                case 1:
+                    status = "Concluída";
+                    break;
+                case 2:
+                    status = "Cancelada";
+                    break;
+            }
+
+            csvBuilder.append(String.format("%s,%s,%s,%s,%s,%s,%s,%s\n",
+                    idStr, dateStr, description, accountName, categoryName, direction, amount, status));
+        }
+
+        return csvBuilder.toString();
     }
 }
