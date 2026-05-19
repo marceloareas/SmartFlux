@@ -78,6 +78,9 @@ public class TransactionService {
 
         transaction.setAmount(transactionDetails.getAmount());
         transaction.setDescription(transactionDetails.getDescription());
+        transaction.setCompetenceDate(transactionDetails.getCompetenceDate());
+        transaction.setDirection(transactionDetails.getDirection());
+        transaction.setStatus(transactionDetails.getStatus());
         transaction.setUpdatedAt(LocalDateTime.now());
 
         Transaction result = transactionRepository.save(transaction);

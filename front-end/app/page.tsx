@@ -20,6 +20,15 @@ export default function Component() {
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [reportTab, setReportTab] = useState('cashflow');
+  const [selectedMonthIdx, setSelectedMonthIdx] = useState(5);
+  const [reportPeriod, setReportPeriod] = useState<'monthly' | '6months'>('monthly');
+  const [exportStart, setExportStart] = useState(() => {
+    const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0];
+  });
+  const [exportEnd, setExportEnd] = useState(() => {
+    const d = new Date(); d.setMonth(d.getMonth() + 1, 0); return d.toISOString().split('T')[0];
+  });
 
   const [newCatOpen, setNewCatOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
@@ -245,9 +254,9 @@ export default function Component() {
 
   const handleExportCsv = async () => {
     try {
-      const now = new Date();
-      // We pass the current month (1-12) and year
-      const month = now.getMonth() + 1;
+      const now = new Date(exportStart);
+      // We pass the selected month (1-12) and year
+      const month = now.getMonth() + 1 + (now.getTimezoneOffset() > 0 ? 0 : 0); // avoid tz issues loosely by just parsing date
       const year = now.getFullYear();
 
       const res = await fetchApi(`/api/transactions/export?month=${month}&year=${year}`);
@@ -266,6 +275,71 @@ export default function Component() {
       alert('Erro ao exportar o relatório');
     }
   };
+
+  const allTxs = txs.filter((t: any) => t.type === 'tx' && !t.isPending);
+  const today = new Date();
+  const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const currentMonthTxs = allTxs.filter((t: any) => new Date(t.dateObj) >= currentMonthStart);
+  
+  const currentIncome = currentMonthTxs.filter((t: any) => t.dir === 'credit').reduce((acc, t) => acc + t.rawAmount, 0);
+  const currentExpense = currentMonthTxs.filter((t: any) => t.dir === 'debit').reduce((acc, t) => acc + t.rawAmount, 0);
+  const currentNet = currentIncome - currentExpense;
+
+  const upcomingTxs = txs.filter((t: any) => t.type === 'tx' && t.isPending)
+                         .sort((a: any, b: any) => new Date(a.dateObj).getTime() - new Date(b.dateObj).getTime())
+                         .slice(0, 3);
+  const recentTxs = txs.filter((t: any) => t.type === 'tx' && !t.isPending)
+                       .sort((a: any, b: any) => new Date(b.dateObj).getTime() - new Date(a.dateObj).getTime())
+                       .slice(0, 4);
+
+  const last6Months = Array.from({ length: 6 }).map((_, i) => {
+    const d = new Date(today.getFullYear(), today.getMonth() - 5 + i, 1);
+    const monthName = d.toLocaleDateString('pt-BR', { month: 'short' });
+    const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    const monthTxs = allTxs.filter((t: any) => {
+      const td = new Date(t.dateObj);
+      return td >= d && td <= end;
+    });
+    const income = monthTxs.filter((t: any) => t.dir === 'credit').reduce((acc, t) => acc + t.rawAmount, 0);
+    const expense = monthTxs.filter((t: any) => t.dir === 'debit').reduce((acc, t) => acc + t.rawAmount, 0);
+    return { month: monthName, income, expense, net: income - expense };
+  });
+  const maxChartVal = Math.max(1, ...last6Months.map(m => Math.max(m.income, m.expense)));
+
+  let activeMonthData;
+  let activeMonthLabel;
+  let activeMonthTxs;
+
+  if (reportPeriod === 'monthly') {
+    activeMonthData = last6Months[selectedMonthIdx];
+    const activeMonthDate = new Date(today.getFullYear(), today.getMonth() - 5 + selectedMonthIdx, 1);
+    activeMonthLabel = activeMonthDate.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace('.', '');
+    const activeMonthEnd = new Date(activeMonthDate.getFullYear(), activeMonthDate.getMonth() + 1, 0, 23, 59, 59);
+    activeMonthTxs = allTxs.filter((t: any) => {
+      const td = new Date(t.dateObj);
+      return td >= activeMonthDate && td <= activeMonthEnd;
+    });
+  } else {
+    const income = last6Months.reduce((acc, m) => acc + m.income, 0);
+    const expense = last6Months.reduce((acc, m) => acc + m.expense, 0);
+    activeMonthData = { income, expense, net: income - expense };
+    activeMonthLabel = 'Últimos 6 meses';
+    const startD = new Date(today.getFullYear(), today.getMonth() - 5, 1);
+    const endD = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
+    activeMonthTxs = allTxs.filter((t: any) => {
+      const td = new Date(t.dateObj);
+      return td >= startD && td <= endD;
+    });
+  }
+
+  const catTotals: Record<string, any> = {};
+  activeMonthTxs.filter((t: any) => t.dir === 'debit').forEach((t: any) => {
+    const key = t.categoryId || 'none';
+    if (!catTotals[key]) catTotals[key] = { name: t.category || 'Sem categoria', icon: t.icon, color: t.color, bg: t.bg, total: 0, count: 0 };
+    catTotals[key].total += t.rawAmount;
+    catTotals[key].count += 1;
+  });
+  const sortedCats = Object.values(catTotals).sort((a: any, b: any) => b.total - a.total);
 
   return (
     <>
@@ -289,9 +363,222 @@ export default function Component() {
           </div>
 
           <div className="screen">
-            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {activeTab === 0 ? (
+              <div className="screen-scroll">
+                <div className="balance-hero">
+                  <div className="balance-period">
+                    <span className="period-dot"></span>
+                    <span style={{textTransform:'capitalize'}}>{today.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace('.', '')}</span>
+                  </div>
+                  <div className="balance-label">Fluxo de caixa líquido</div>
+                  <div className={`balance-amount ${currentNet >= 0 ? 'positive' : 'negative'}`}>
+                    {currentNet >= 0 ? '+ ' : '- '}R$ {Math.abs(currentNet).toFixed(2).replace('.', ',')}
+                  </div>
+                  <div className="balance-split">
+                    <div className="split-item">
+                      <div className="split-label">Receitas</div>
+                      <div className="split-val in">+ R$ {currentIncome.toFixed(2).replace('.', ',')}</div>
+                    </div>
+                    <div className="split-item">
+                      <div className="split-label">Despesas</div>
+                      <div className="split-val out">- R$ {currentExpense.toFixed(2).replace('.', ',')}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="section">
+                  <div className="section-header">
+                    <div className="section-title">Próximos vencimentos</div>
+                    <a className="section-link" onClick={() => setActiveTab(2)}>Ver tudo →</a>
+                  </div>
+                  <div className="upcoming-list">
+                    {upcomingTxs.map((t: any) => {
+                      const overdue = new Date(t.dateObj).setHours(0,0,0,0) < new Date().setHours(0,0,0,0);
+                      return (
+                        <div key={t.id} className={`upcoming-card ${overdue ? 'overdue' : t.dir}`} onClick={() => { setDetail(t); setDetailOpen(true); }}>
+                          <div className="uc-icon" style={{ background: t.bg, color: t.color }}>{t.icon}</div>
+                          <div className="uc-body">
+                            <div className="uc-desc">{t.desc}</div>
+                            <div className="uc-meta">{t.category ? `${t.category} · ` : ''}{new Date(t.dateObj).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</div>
+                          </div>
+                          {overdue && <div className="overdue-pill">Atrasada</div>}
+                          <div className="uc-amount" style={{ color: overdue ? 'var(--warning)' : t.dir === 'debit' ? 'var(--debit)' : 'var(--credit)' }}>
+                            {t.dir === 'debit' ? '- ' : '+ '}R$ {t.rawAmount.toFixed(2).replace('.', ',')}
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {upcomingTxs.length === 0 && <div style={{textAlign: 'center', color: 'var(--text-3)', padding: '10px', fontSize: '13px'}}>Nenhum vencimento futuro.</div>}
+                  </div>
+                </div>
+
+                <div className="section" style={{ marginTop: '20px', paddingBottom: '20px' }}>
+                  <div className="section-header">
+                    <div className="section-title">Transações recentes</div>
+                    <a className="section-link" onClick={() => setActiveTab(1)}>Ver tudo →</a>
+                  </div>
+                  <div className="recent-list">
+                    {recentTxs.map((t: any) => (
+                      <div key={t.id} className={`tx-card ${t.dir}`} onClick={() => { setDetail(t); setDetailOpen(true); }}>
+                        <div className="tx-card-icon" style={{ background: t.bg, color: t.color }}>{t.icon}</div>
+                        <div className="tx-card-body">
+                          <div className="tx-card-desc">{t.desc}</div>
+                          <div className="tx-card-meta">{t.category ? `${t.category} · ` : ''}{new Date(t.dateObj).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</div>
+                        </div>
+                        <div className="tx-card-amount">
+                          {t.dir === 'debit' ? '- ' : '+ '}{t.amount.replace('R$ ', '')}
+                        </div>
+                      </div>
+                    ))}
+                    {recentTxs.length === 0 && <div style={{textAlign: 'center', color: 'var(--text-3)', padding: '10px', fontSize: '13px'}}>Nenhuma transação recente.</div>}
+                  </div>
+                </div>
+              </div>
+            ) : activeTab === 3 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+                <div className="page-header" style={{ paddingBottom: '16px' }}>
+                  <div className="page-title">Relatórios</div>
+                </div>
+                <div className="sub-nav">
+                  <div className={`sub-tab ${reportTab === 'cashflow' ? 'active' : ''}`} onClick={() => setReportTab('cashflow')}>Fluxo de caixa</div>
+                  <div className={`sub-tab ${reportTab === 'categories' ? 'active' : ''}`} onClick={() => setReportTab('categories')}>Por categoria</div>
+                  <div className={`sub-tab ${reportTab === 'export' ? 'active' : ''}`} onClick={() => setReportTab('export')}>Exportar</div>
+                </div>
+                
+                {reportTab === 'cashflow' && (
+                  <div className="panel active">
+                    <div className="period-bar">
+                      <button className={`period-btn ${reportPeriod === 'monthly' ? 'active' : ''}`} style={{ opacity: reportPeriod === 'monthly' ? 1 : 0.5 }} onClick={() => setReportPeriod('monthly')}>Mensal</button>
+                      <button className={`period-btn ${reportPeriod === '6months' ? 'active' : ''}`} style={{ opacity: reportPeriod === '6months' ? 1 : 0.5 }} onClick={() => setReportPeriod('6months')}>6 meses</button>
+                      <div className="period-nav">
+                        {reportPeriod === 'monthly' && (
+                          <div className="period-current" style={{textTransform:'capitalize'}}>{activeMonthLabel}</div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="summary-strip">
+                      <div className="summary-item">
+                        <div className="summary-lbl">Líquido</div>
+                        <div className="summary-val" style={{ color: activeMonthData.net >= 0 ? 'var(--accent)' : 'var(--debit)' }}>
+                          {activeMonthData.net >= 0 ? '+' : '-'}R$ {Math.abs(activeMonthData.net).toFixed(2).replace('.', ',')}
+                        </div>
+                      </div>
+                      <div className="summary-item">
+                        <div className="summary-lbl">Receitas</div>
+                        <div className="summary-val" style={{ color: 'var(--credit)' }}>R$ {activeMonthData.income.toFixed(2).replace('.', ',')}</div>
+                      </div>
+                      <div className="summary-item">
+                        <div className="summary-lbl">Despesas</div>
+                        <div className="summary-val" style={{ color: 'var(--debit)' }}>R$ {activeMonthData.expense.toFixed(2).replace('.', ',')}</div>
+                      </div>
+                    </div>
+
+                    <div className="chart-wrap">
+                      <div className="chart-title">Receitas vs despesas (6 meses)</div>
+                      <div className="bar-chart">
+                        {last6Months.map((m, i) => (
+                          <div key={i} className={`bar-col ${reportPeriod === '6months' || i === selectedMonthIdx ? 'current' : ''}`} onClick={() => { setReportPeriod('monthly'); setSelectedMonthIdx(i); }} style={{ cursor: 'pointer' }}>
+                            <div className="bar-wrap">
+                              <div className="bar-seg income" style={{ height: `${Math.max(4, (m.income / maxChartVal) * 70)}px` }}></div>
+                              <div className="bar-seg expense" style={{ height: `${Math.max(4, (m.expense / maxChartVal) * 70)}px` }}></div>
+                            </div>
+                            <div className="bar-month" style={{textTransform:'capitalize'}}>{m.month.replace('.','')}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="chart-legend">
+                        <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--credit)' }}></div>Receitas</div>
+                        <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--debit)' }}></div>Despesas</div>
+                      </div>
+                    </div>
+
+                    {reportPeriod === '6months' && (
+                      <div className="breakdown-list">
+                        <div style={{fontSize:'11px',fontWeight:600,letterSpacing:'.07em',textTransform:'uppercase',color:'var(--text-3)',marginBottom:'2px'}}>Líquido por mês</div>
+                        {last6Months.slice().reverse().map((m, i) => {
+                          const maxNet = Math.max(1, ...last6Months.map(x => Math.abs(x.net)));
+                          const pct = Math.max(2, (Math.abs(m.net) / maxNet) * 100);
+                          const isPos = m.net >= 0;
+                          return (
+                            <div key={i} className="breakdown-row">
+                              <div className="breakdown-month" style={{textTransform:'capitalize'}}>{m.month.replace('.','')}</div>
+                              <div className="breakdown-bar-wrap"><div className="breakdown-bar-fill" style={{ width: `${pct}%`, background: isPos ? 'var(--accent)' : 'var(--debit)' }}></div></div>
+                              <div className="breakdown-val" style={{ color: isPos ? 'var(--accent)' : 'var(--debit)' }}>
+                                {isPos ? '+' : '-'}R$ {Math.abs(m.net).toFixed(2).replace('.', ',')}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {reportTab === 'categories' && (
+                  <div className="panel active">
+                    <div className="cat-summary">
+                      <div className="cat-total-label">Total gasto — <span style={{textTransform:'capitalize'}}>{activeMonthLabel}</span></div>
+                      <div className="cat-total-val">R$ {activeMonthData.expense.toFixed(2).replace('.', ',')}</div>
+                    </div>
+                    <div className="cat-list" style={{ marginTop: '16px' }}>
+                      {sortedCats.map((cat, i) => (
+                        <div key={i} className="cat-row">
+                          <div className="cat-icon" style={{ background: cat.bg, color: cat.color }}>{cat.icon}</div>
+                          <div className="cat-info">
+                            <div className="cat-name">{cat.name}</div>
+                            <div className="cat-bar-wrap">
+                              <div className="cat-bar-fill" style={{ width: `${Math.max(2, (cat.total / Math.max(1, activeMonthData.expense)) * 100)}%`, background: cat.color }}></div>
+                            </div>
+                          </div>
+                          <div className="cat-count">{cat.count} trans</div>
+                          <div className="cat-amount">R$ {cat.total.toFixed(2).replace('.', ',')}</div>
+                        </div>
+                      ))}
+                      {sortedCats.length === 0 && <div style={{textAlign: 'center', color: 'var(--text-3)', padding: '20px'}}>Nenhuma despesa neste mês.</div>}
+                    </div>
+                  </div>
+                )}
+
+                {reportTab === 'export' && (
+                  <div className="panel active">
+                    <div className="export-wrap">
+                      <div className="field-row">
+                        <div className="field">
+                          <div className="field-label">De</div>
+                          <input type="date" value={exportStart} onChange={e => setExportStart(e.target.value)} />
+                        </div>
+                        <div className="field">
+                          <div className="field-label">Até</div>
+                          <input type="date" value={exportEnd} onChange={e => setExportEnd(e.target.value)} />
+                        </div>
+                      </div>
+                      <div className="field">
+                        <div className="field-label">Incluir</div>
+                        <select>
+                          <option>Todas as transações</option>
+                          <option>Apenas concluídas</option>
+                        </select>
+                      </div>
+                      <div className="field">
+                        <div className="field-label">Formato</div>
+                        <select>
+                          <option>CSV (.csv)</option>
+                        </select>
+                      </div>
+                      <button className="btn-export" onClick={handleExportCsv}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Baixar CSV
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+                <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div className="page-title">Transações</div>
+                <div className="page-title">{activeTab === 0 ? 'Início' : activeTab === 2 ? 'Futuro' : activeTab === 3 ? 'Relatórios' : 'Transações'}</div>
                 <div className="flow-summary">
                   <span className="flow-label">Fluxo atual:</span>
                   <span className={`flow-value ${flowTotal >= 0 ? 'positive' : 'negative'}`}>
@@ -337,19 +624,21 @@ export default function Component() {
               </div>
             </div>
 
-            <div className="filter-bar">
-              <button className={`chip ${currentFilter === 'all' ? 'active' : ''}`} onClick={() => setCurrentFilter('all')}>Todas</button>
-              <button className={`chip debit-chip ${currentFilter === 'debit' ? 'active' : ''}`} onClick={() => setCurrentFilter('debit')}>Despesas</button>
-              <button className={`chip credit-chip ${currentFilter === 'credit' ? 'active' : ''}`} onClick={() => setCurrentFilter('credit')}>Receitas</button>
-              <button className={`chip ${currentFilter === 'pending' ? 'active' : ''}`} onClick={() => setCurrentFilter('pending')}>Pendentes</button>
-            </div>
+            {activeTab !== 2 && (
+              <div className="filter-bar">
+                <button className={`chip ${currentFilter === 'all' ? 'active' : ''}`} onClick={() => setCurrentFilter('all')}>Todas</button>
+                <button className={`chip debit-chip ${currentFilter === 'debit' ? 'active' : ''}`} onClick={() => setCurrentFilter('debit')}>Despesas</button>
+                <button className={`chip credit-chip ${currentFilter === 'credit' ? 'active' : ''}`} onClick={() => setCurrentFilter('credit')}>Receitas</button>
+              </div>
+            )}
 
             <div className="tx-list" id="txList">
               {txs.filter((t: any) => {
                 if (t.type === 'month') return true;
-                if (currentFilter === 'all') return !t.isPending;
-                if (currentFilter === 'pending') return t.isPending;
-                return t.dir === currentFilter && !t.isPending;
+                if (activeTab === 2) return t.isPending;
+                if (t.isPending) return false;
+                if (currentFilter === 'all') return true;
+                return t.dir === currentFilter;
               }).map((t: any) => {
                 if (t.type === 'month') {
                   // Find this month's index in the ORIGINAL txs array to get the correct section
@@ -358,9 +647,12 @@ export default function Component() {
                   const sectionTxs = txs.slice(fullIdx + 1, nextMonthIdx === -1 ? undefined : fullIdx + 1 + nextMonthIdx);
 
                   let show = false;
-                  if (currentFilter === 'all') show = sectionTxs.some(x => x.type === 'tx' && !x.isPending);
-                  else if (currentFilter === 'pending') show = sectionTxs.some(x => x.type === 'tx' && x.isPending);
-                  else show = sectionTxs.some(x => x.type === 'tx' && x.dir === currentFilter && !x.isPending);
+                  if (activeTab === 2) {
+                    show = sectionTxs.some(x => x.type === 'tx' && x.isPending);
+                  } else {
+                    if (currentFilter === 'all') show = sectionTxs.some(x => x.type === 'tx' && !x.isPending);
+                    else show = sectionTxs.some(x => x.type === 'tx' && x.dir === currentFilter && !x.isPending);
+                  }
 
                   if (!show) return null;
                   return <div key={`month-${t.label}`} className="month-label">{t.label}</div>;
@@ -377,6 +669,8 @@ export default function Component() {
                 );
               })}
             </div>
+              </div>
+            )}
           </div>
 
           <div className="tabbar">

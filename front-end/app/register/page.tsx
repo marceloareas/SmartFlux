@@ -9,6 +9,7 @@ export default function Register() {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
@@ -24,6 +25,11 @@ export default function Register() {
 
         if (!isValidPassword) {
             setError('A senha não atende aos requisitos mínimos.');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            setError('As senhas não coincidem.');
             return;
         }
 
@@ -131,6 +137,17 @@ export default function Register() {
                                             um número
                                         </div>
                                     </div>
+                                </div>
+
+                                <div className="field">
+                                    <label className="field-label">Confirmar Senha</label>
+                                    <input
+                                        type="password"
+                                        placeholder="••••••••"
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        required
+                                    />
                                 </div>
 
                                 {error && (

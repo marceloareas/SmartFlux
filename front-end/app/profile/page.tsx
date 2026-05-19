@@ -9,6 +9,7 @@ export default function Profile() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const [message, setMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -34,6 +35,11 @@ export default function Profile() {
     e.preventDefault();
     if (!currentUser) return;
 
+    if (password && password !== confirmPassword) {
+      setMessage({ type: 'error', text: 'As senhas não coincidem' });
+      return;
+    }
+
     setMessage(null);
     setLoading(true);
 
@@ -58,6 +64,7 @@ export default function Profile() {
 
       setMessage({ type: 'success', text: 'Perfil atualizado com sucesso!' });
       setPassword(''); // clear pass field
+      setConfirmPassword('');
     } catch (err: any) {
       setMessage({ type: 'error', text: err.message || 'Falha ao atualizar perfil' });
     } finally {
@@ -149,6 +156,19 @@ export default function Profile() {
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
+
+              {password.length > 0 && (
+                <div className="field">
+                  <label className="field-label">Confirmar Nova Senha</label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
 
               {message && (
                 <div style={{
