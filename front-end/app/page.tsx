@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import './page.css';
 import { fetchApi } from "../lib/api";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export default function Component() {
   const [activeTab, setActiveTab] = useState(1);
@@ -275,6 +277,58 @@ export default function Component() {
       alert('Erro ao exportar o relatório');
     }
   };
+
+  const handleExportPdf = () => {
+    try {
+      const now = new Date(exportStart);
+      const month = now.getMonth();
+      const year = now.getFullYear();
+      const startDate = new Date(year, month, 1);
+      const endDate = new Date(year, month + 1, 0, 23, 59, 59);
+
+      const periodTxs = txs.filter((t: any) => {
+        if (t.type !== 'tx' || t.isPending) return false;
+        const td = new Date(t.dateObj);
+        return td >= startDate && td <= endDate;
+      });
+
+      const income = periodTxs.filter((t: any) => t.dir === 'credit').reduce((acc: number, t: any) => acc + t.rawAmount, 0);
+      const expense = periodTxs.filter((t: any) => t.dir === 'debit').reduce((acc: number, t: any) => acc + t.rawAmount, 0);
+      const net = income - expense;
+
+      const doc = new jsPDF();
+      const monthStr = (month + 1).toString().padStart(2, '0');
+
+      doc.setFontSize(18);
+      doc.text(`Relatório de Transações - ${monthStr}/${year}`, 14, 22);
+
+      doc.setFontSize(11);
+      doc.text(`Receitas: R$ ${income.toFixed(2).replace('.', ',')}`, 14, 30);
+      doc.text(`Despesas: R$ ${expense.toFixed(2).replace('.', ',')}`, 14, 36);
+      doc.text(`Líquido: R$ ${net.toFixed(2).replace('.', ',')}`, 14, 42);
+
+      const tableData = periodTxs.map((t: any) => [
+        new Date(t.dateObj).toLocaleDateString('pt-BR'),
+        t.desc || 'Sem descrição',
+        t.category || 'Sem categoria',
+        (t.dir === 'debit' ? '-' : '+') + ' R$ ' + t.rawAmount.toFixed(2).replace('.', ',')
+      ]);
+
+      autoTable(doc, {
+        startY: 50,
+        head: [['Data', 'Descrição', 'Categoria', 'Valor']],
+        body: tableData,
+        headStyles: { fillColor: [3, 13, 8] },
+      });
+
+      doc.save(`relatorio_transacoes_${monthStr}_${year}.pdf`);
+      setExportMenuOpen(false);
+    } catch (e) {
+      console.error('Erro ao exportar PDF', e);
+      alert('Erro ao exportar o relatório PDF');
+    }
+  };
+
 
   const allTxs = txs.filter((t: any) => t.type === 'tx' && !t.isPending);
   const today = new Date();
@@ -614,10 +668,12 @@ export default function Component() {
                       Relatório Mensal (CSV)
                     </div>
                     <div
-                      style={{ padding: '8px 12px', fontSize: '12px', color: 'var(--text-3)', cursor: 'not-allowed', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', gap: '12px' }}
+                      onClick={handleExportPdf}
+                      style={{ padding: '8px 12px', fontSize: '12px', color: 'var(--text)', cursor: 'pointer', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', gap: '12px' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
                       <span>Relatório Detalhado (PDF)</span>
-                      <span style={{ fontSize: '10px', background: 'var(--border)', padding: '1px 4px', borderRadius: '4px' }}>Beta</span>
                     </div>
                   </div>
                 )}
