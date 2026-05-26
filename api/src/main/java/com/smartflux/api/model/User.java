@@ -44,6 +44,9 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private String timezone = "America/Sao_Paulo";
 
+    @Column(name = "avatar_url")
+    private String avatarUrl;
+
     @Column(nullable = false, name = "created_at",updatable = false)
     @CreationTimestamp
     private LocalDateTime createdAt;

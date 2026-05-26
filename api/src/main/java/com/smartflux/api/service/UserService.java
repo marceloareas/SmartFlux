@@ -74,4 +74,13 @@ public class UserService {
         return newUser;
     }
 
+    // AVATAR ------------------------------------------------------------------
+    @Transactional
+    public User updateAvatarUrl(UUID id, String avatarUrl) {
+        User user = findUserById(id);
+        user.setAvatarUrl(avatarUrl);
+        user.setUpdatedAt(LocalDateTime.now());
+        return user;
+    }
+
 }

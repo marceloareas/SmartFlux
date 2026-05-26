@@ -31,6 +31,7 @@ export default function Component() {
   const [exportEnd, setExportEnd] = useState(() => {
     const d = new Date(); d.setMonth(d.getMonth() + 1, 0); return d.toISOString().split('T')[0];
   });
+  const [exportFormat, setExportFormat] = useState('csv');
 
   const [newCatOpen, setNewCatOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
@@ -256,12 +257,11 @@ export default function Component() {
 
   const handleExportCsv = async () => {
     try {
-      const now = new Date(exportStart);
-      // We pass the selected month (1-12) and year
-      const month = now.getMonth() + 1 + (now.getTimezoneOffset() > 0 ? 0 : 0); // avoid tz issues loosely by just parsing date
-      const year = now.getFullYear();
+      const [yearStr, monthStr] = exportStart.split('-');
+      const month = parseInt(monthStr, 10);
+      const year = parseInt(yearStr, 10);
 
-      const res = await fetchApi(`/api/transactions/export?month=${month}&year=${year}`);
+      const res = await fetchApi(`/api/transactions/export?month=${month}&year=${year}&t=${Date.now()}`);
       const blob = await res.blob();
 
       const url = window.URL.createObjectURL(blob);
@@ -280,9 +280,9 @@ export default function Component() {
 
   const handleExportPdf = () => {
     try {
-      const now = new Date(exportStart);
-      const month = now.getMonth();
-      const year = now.getFullYear();
+      const [yearStr, monthStr] = exportStart.split('-');
+      const month = parseInt(monthStr, 10) - 1;
+      const year = parseInt(yearStr, 10);
       const startDate = new Date(year, month, 1);
       const endDate = new Date(year, month + 1, 0, 23, 59, 59);
 
@@ -297,10 +297,10 @@ export default function Component() {
       const net = income - expense;
 
       const doc = new jsPDF();
-      const monthStr = (month + 1).toString().padStart(2, '0');
+      const monthStrFormatted = (month + 1).toString().padStart(2, '0');
 
       doc.setFontSize(18);
-      doc.text(`Relatório de Transações - ${monthStr}/${year}`, 14, 22);
+      doc.text(`Relatório de Transações - ${monthStrFormatted}/${year}`, 14, 22);
 
       doc.setFontSize(11);
       doc.text(`Receitas: R$ ${income.toFixed(2).replace('.', ',')}`, 14, 30);
@@ -321,7 +321,7 @@ export default function Component() {
         headStyles: { fillColor: [3, 13, 8] },
       });
 
-      doc.save(`relatorio_transacoes_${monthStr}_${year}.pdf`);
+      doc.save(`relatorio_transacoes_${monthStrFormatted}_${year}.pdf`);
       setExportMenuOpen(false);
     } catch (e) {
       console.error('Erro ao exportar PDF', e);
@@ -411,8 +411,12 @@ export default function Component() {
               </div>
               <span className="logo-name">SmartFlux</span>
             </div>
-            <div className="avatar-btn" onClick={() => window.location.href = "/profile"} style={{ fontSize: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: '50%', width: '36px', height: '36px', userSelect: 'none' }}>
-              {currentUser?.name ? getAnimalAvatar(currentUser.name) : '🐶'}
+            <div className="avatar-btn" onClick={() => window.location.href = "/profile"} style={{ fontSize: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface2)', border: '2px solid var(--accent)', borderRadius: '50%', width: '36px', height: '36px', userSelect: 'none', overflow: 'hidden', cursor: 'pointer', flexShrink: 0 }}>
+              {currentUser?.avatarUrl ? (
+                <img src={currentUser.avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <span style={{ lineHeight: 1 }}>{currentUser?.name ? getAnimalAvatar(currentUser.name) : '🐶'}</span>
+              )}
             </div>
           </div>
 
@@ -616,13 +620,14 @@ export default function Component() {
                       </div>
                       <div className="field">
                         <div className="field-label">Formato</div>
-                        <select>
-                          <option>CSV (.csv)</option>
+                        <select value={exportFormat} onChange={e => setExportFormat(e.target.value)}>
+                          <option value="csv">CSV (.csv)</option>
+                          <option value="pdf">PDF (.pdf)</option>
                         </select>
                       </div>
-                      <button className="btn-export" onClick={handleExportCsv}>
+                      <button className="btn-export" onClick={() => exportFormat === 'pdf' ? handleExportPdf() : handleExportCsv()}>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                        Baixar CSV
+                        Baixar relatório
                       </button>
                     </div>
                   </div>
@@ -641,42 +646,6 @@ export default function Component() {
                 </div>
               </div>
               <div style={{ position: 'relative' }}>
-                <button
-                  onClick={() => setExportMenuOpen(!exportMenuOpen)}
-                  style={{
-                    background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)',
-                    padding: '6px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: '4px'
-                  }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                  Exportar
-                </button>
-                {exportMenuOpen && (
-                  <div style={{
-                    position: 'absolute', top: '100%', right: 0, marginTop: '8px',
-                    background: 'var(--surface)', border: '1px solid var(--border)',
-                    borderRadius: '8px', padding: '4px', zIndex: 100, width: 'max-content',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-                  }}>
-                    <div
-                      onClick={handleExportCsv}
-                      style={{ padding: '8px 12px', fontSize: '12px', color: 'var(--text)', cursor: 'pointer', borderRadius: '4px' }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    >
-                      Relatório Mensal (CSV)
-                    </div>
-                    <div
-                      onClick={handleExportPdf}
-                      style={{ padding: '8px 12px', fontSize: '12px', color: 'var(--text)', cursor: 'pointer', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', gap: '12px' }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    >
-                      <span>Relatório Detalhado (PDF)</span>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 

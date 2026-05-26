@@ -26,6 +26,11 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/smartflux
       - SPRING_DATASOURCE_USERNAME=admin
       - SPRING_DATASOURCE_PASSWORD=admin
+      - AVATAR_STORAGE_DIR=/app/avatars
+      - SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE=10MB
+      - SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE=10MB
+    volumes:
+      - avatars_data:/app/avatars
 
   frontend:
     build:
@@ -41,3 +46,4 @@ services:
 
 volumes:
   postgres_data:
+  avatars_data:

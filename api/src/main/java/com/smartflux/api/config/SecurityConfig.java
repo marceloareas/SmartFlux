@@ -34,6 +34,7 @@ public class SecurityConfig {
                         .requestMatchers("/auth/login", "/auth/register").permitAll()// Permite que as rotas de autenticação sejam acessadas sem autenticação
                         .requestMatchers("/swagger-ui/**").permitAll()// Permite que o swagger ui seja acessado sem autenticação
                         .requestMatchers("/v3/api-docs/**").permitAll()// Permite que a documentação da API seja acessada sem autenticação
+                        .requestMatchers("/avatars/**").permitAll()// Permite servir imagens de avatar sem autenticação
                         .anyRequest().authenticated())
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class);
                 
