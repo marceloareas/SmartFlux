@@ -44,6 +44,16 @@ services:
     environment:
       - BACKEND_URL=http://backend:8080
 
+  llm-service:
+    build:
+      context: ./llm-service
+      dockerfile: Dockerfile
+    container_name: smartflux_llm_service
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    shm_size: "2gb"
+
 volumes:
   postgres_data:
   avatars_data:
