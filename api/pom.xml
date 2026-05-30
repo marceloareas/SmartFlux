@@ -92,6 +92,12 @@
 			<version>4.4.0</version>
 		</dependency>
 		
+		<dependency>
+			<groupId>net.datafaker</groupId>
+			<artifactId>datafaker</artifactId>
+			<version>2.5.4</version>
+		</dependency>
+		
 	</dependencies>
 
 	<build>
