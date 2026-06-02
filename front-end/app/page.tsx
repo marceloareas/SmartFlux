@@ -257,17 +257,13 @@ export default function Component() {
 
   const handleExportCsv = async () => {
     try {
-      const [yearStr, monthStr] = exportStart.split('-');
-      const month = parseInt(monthStr, 10);
-      const year = parseInt(yearStr, 10);
-
-      const res = await fetchApi(`/api/transactions/export?month=${month}&year=${year}&t=${Date.now()}`);
+      const res = await fetchApi(`/api/transactions/export?startDate=${exportStart}&endDate=${exportEnd}&t=${Date.now()}`);
       const blob = await res.blob();
 
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `relatorio_transacoes_${month}_${year}.csv`;
+      a.download = `relatorio_transacoes_${exportStart}_${exportEnd}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -280,11 +276,8 @@ export default function Component() {
 
   const handleExportPdf = () => {
     try {
-      const [yearStr, monthStr] = exportStart.split('-');
-      const month = parseInt(monthStr, 10) - 1;
-      const year = parseInt(yearStr, 10);
-      const startDate = new Date(year, month, 1);
-      const endDate = new Date(year, month + 1, 0, 23, 59, 59);
+      const startDate = new Date(exportStart + 'T00:00:00');
+      const endDate = new Date(exportEnd + 'T23:59:59');
 
       const periodTxs = txs.filter((t: any) => {
         if (t.type !== 'tx' || t.isPending) return false;
@@ -297,10 +290,13 @@ export default function Component() {
       const net = income - expense;
 
       const doc = new jsPDF();
-      const monthStrFormatted = (month + 1).toString().padStart(2, '0');
 
       doc.setFontSize(18);
-      doc.text(`Relatório de Transações - ${monthStrFormatted}/${year}`, 14, 22);
+      const formatLabelDate = (dStr: string) => {
+        const parts = dStr.split('-');
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      };
+      doc.text(`Relatório de Transações - ${formatLabelDate(exportStart)} até ${formatLabelDate(exportEnd)}`, 14, 22);
 
       doc.setFontSize(11);
       doc.text(`Receitas: R$ ${income.toFixed(2).replace('.', ',')}`, 14, 30);
@@ -321,7 +317,7 @@ export default function Component() {
         headStyles: { fillColor: [3, 13, 8] },
       });
 
-      doc.save(`relatorio_transacoes_${monthStrFormatted}_${year}.pdf`);
+      doc.save(`relatorio_transacoes_${exportStart}_${exportEnd}.pdf`);
       setExportMenuOpen(false);
     } catch (e) {
       console.error('Erro ao exportar PDF', e);

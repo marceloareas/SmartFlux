@@ -100,6 +100,12 @@ export default function Login() {
                                     />
                                 </div>
 
+                            <div style={{ textAlign: 'right', marginTop: '-8px' }}>
+                                <a href="/forgot-password" style={{ color: 'var(--text-3)', fontSize: '13px', textDecoration: 'none' }}>
+                                    Esqueci a senha
+                                </a>
+                            </div>
+
                                 {error && (
                                     <div style={{
                                         padding: '12px', background: 'var(--debit-bg)',

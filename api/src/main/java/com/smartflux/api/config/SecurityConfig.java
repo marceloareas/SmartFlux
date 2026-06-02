@@ -31,7 +31,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))// Garante que o Spring não crie sessões HTTP
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()// Permite que os erros sejam acessados sem autenticação
-                        .requestMatchers("/auth/login", "/auth/register").permitAll()// Permite que as rotas de autenticação sejam acessadas sem autenticação
+                        .requestMatchers("/auth/login", "/auth/register", "/auth/forgot-password", "/auth/reset-password").permitAll()// Permite que as rotas de autenticação sejam acessadas sem autenticação
                         .requestMatchers("/swagger-ui/**").permitAll()// Permite que o swagger ui seja acessado sem autenticação
                         .requestMatchers("/v3/api-docs/**").permitAll()// Permite que a documentação da API seja acessada sem autenticação
                         .requestMatchers("/avatars/**").permitAll()// Permite servir imagens de avatar sem autenticação

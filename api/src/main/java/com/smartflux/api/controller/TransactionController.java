@@ -70,12 +70,14 @@ public class TransactionController {
 
     @GetMapping("/export")
     public ResponseEntity<byte[]> exportMonthlyReport(
-            @RequestParam int month,
-            @RequestParam int year) {
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
 
-        log.info("Recebendo requisição para exportar relatório das transacoes. Mês: {}, Ano: {}", month, year);
+        log.info("Recebendo requisição para exportar relatório das transacoes. Mês: {}, Ano: {}, Start: {}, End: {}", month, year, startDate, endDate);
 
-        String csvData = transactionService.exportMonthlyReportAsCsv(month, year);
+        String csvData = transactionService.exportReportAsCsv(month, year, startDate, endDate);
         byte[] csvBytes = csvData.getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
         HttpHeaders headers = new HttpHeaders();
@@ -86,8 +88,14 @@ public class TransactionController {
         System.arraycopy(bom, 0, contentWithBom, 0, bom.length);
         System.arraycopy(csvBytes, 0, contentWithBom, bom.length, csvBytes.length);
 
-        headers.set(HttpHeaders.CONTENT_DISPOSITION,
-                "attachment; filename=\"relatorio_transacoes_" + month + "_" + year + ".csv\"");
+        String filename;
+        if (startDate != null && endDate != null) {
+            filename = "relatorio_transacoes_" + startDate + "_" + endDate + ".csv";
+        } else {
+            filename = "relatorio_transacoes_" + (month != null ? month : "todos") + "_" + (year != null ? year : "todos") + ".csv";
+        }
+
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"");
 
         return ResponseEntity.ok()
                 .headers(headers)

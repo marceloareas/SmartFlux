@@ -88,13 +88,25 @@ public class TransactionService {
         return result;
     }
 
-    public String exportMonthlyReportAsCsv(int month, int year) {
-        YearMonth yearMonth = YearMonth.of(year, month);
-        LocalDateTime startOfMonth = yearMonth.atDay(1).atStartOfDay();
-        LocalDateTime endOfMonth = yearMonth.atEndOfMonth().atTime(23, 59, 59, 999999999);
+    public String exportReportAsCsv(Integer month, Integer year, String startDate, String endDate) {
+        LocalDateTime start;
+        LocalDateTime end;
+
+        if (startDate != null && endDate != null) {
+            start = java.time.LocalDate.parse(startDate).atStartOfDay();
+            end = java.time.LocalDate.parse(endDate).atTime(23, 59, 59, 999999999);
+        } else if (month != null && year != null) {
+            YearMonth yearMonth = YearMonth.of(year, month);
+            start = yearMonth.atDay(1).atStartOfDay();
+            end = yearMonth.atEndOfMonth().atTime(23, 59, 59, 999999999);
+        } else {
+            YearMonth yearMonth = YearMonth.now();
+            start = yearMonth.atDay(1).atStartOfDay();
+            end = yearMonth.atEndOfMonth().atTime(23, 59, 59, 999999999);
+        }
 
         List<Transaction> transactions = transactionRepository.findByAccountUserIdAndCompetenceDateBetween(
-                getCurrentUserId(), startOfMonth, endOfMonth);
+                getCurrentUserId(), start, end);
 
         StringBuilder csvBuilder = new StringBuilder();
         // Cabeçalho do CSV
