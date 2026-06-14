@@ -29,6 +29,7 @@ services:
       - AVATAR_STORAGE_DIR=/app/avatars
       - SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE=10MB
       - SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE=10MB
+      - LLM_SERVICE_URL=http://llm-service:8000
     volumes:
       - avatars_data:/app/avatars
 
@@ -46,7 +47,7 @@ services:
 
   llm-service:
     build:
-      context: ./llm-service
+      context: ./llm
       dockerfile: Dockerfile
     container_name: smartflux_llm_service
     ports:
