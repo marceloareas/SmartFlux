@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 import com.smartflux.api.model.Account;
 import com.smartflux.api.model.User;
 import com.smartflux.api.repository.AccountRepository;
-import com.smartflux.api.service.exceptionsCustom.ResourceNotFoundException;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;

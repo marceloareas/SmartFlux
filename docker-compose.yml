@@ -29,6 +29,12 @@ services:
       - AVATAR_STORAGE_DIR=/app/avatars
       - SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE=10MB
       - SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE=10MB
+      - LLM_SERVICE_URL=http://llm-service:8000
+      - MAIL_USERNAME=aedf6b001@smtp-brevo.com
+      - MAIL_PASSWORD=xsmtpsib-e38d7f48274e93e8ad11db2bf2841cc50d63ba1d3e2d9d813604f64577a3869b-NHldaYGYiLAlsH47
+      - SPRING_MAIL_HOST=smtp-relay.brevo.com
+      - SPRING_MAIL_PORT=587
+      - MAIL_FROM=smartflux1@outlook.com
     volumes:
       - avatars_data:/app/avatars
 

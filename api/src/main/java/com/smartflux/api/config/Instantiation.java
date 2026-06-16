@@ -18,6 +18,7 @@ import com.smartflux.api.repository.CategoryRepository;
 import com.smartflux.api.repository.TransactionRepository;
 import com.smartflux.api.repository.SessionRepository;
 import com.smartflux.api.repository.UserRepository;
+import com.smartflux.api.repository.PasswordResetTokenRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ public class Instantiation implements CommandLineRunner {
         private final TransactionRepository transactionRepository;
         private final SessionRepository sessionRepository;
         private final UserRepository userRepository;
+        private final PasswordResetTokenRepository passwordResetTokenRepository;
         private final PasswordEncoder passwordEncoder;
         private final net.datafaker.Faker faker;
 
@@ -38,6 +40,7 @@ public class Instantiation implements CommandLineRunner {
         public void run(String... args) throws Exception {
 
                 sessionRepository.deleteAll();
+                passwordResetTokenRepository.deleteAll();
                 transactionRepository.deleteAll();
                 accountRepository.deleteAll();
                 categoryRepository.deleteAll();
@@ -59,6 +62,12 @@ public class Instantiation implements CommandLineRunner {
                 List<Category> categories = new ArrayList<>();
                 for (int i = 0; i < catNames.length; i++) {
                         categories.add(new Category(mainUser, catNames[i], catColors[i]));
+                java.util.Set<String> generatedNames = new java.util.HashSet<>();
+                while (categories.size() < 10) {
+                        String name = faker.commerce().department();
+                        if (generatedNames.add(name)) {
+                                categories.add(new Category(mainUser, name, faker.color().hex()));
+                        }
                 }
                 categoryRepository.saveAll(categories);
 

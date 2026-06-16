@@ -26,7 +26,6 @@ O SmartFlux foi pensado para ter a **menor fricção possível**. Sabemos que o 
 
 ## Funcionalidades
 
-### Início
 - **Autenticação e Segurança:** Controle de usuários com persistência segura de dados.
 - **Lançamentos Ágeis:** Registro manual rápido de receitas e despesas.
 - **Gestão de Vencimentos:** Controle de contas a pagar e a receber com alertas de data.
@@ -34,8 +33,6 @@ O SmartFlux foi pensado para ter a **menor fricção possível**. Sabemos que o 
   - Visão de fluxo de caixa.
   - Análise de receitas e despesas por categorias.
   - Exportação de dados para `.CSV`.
-
-### Funcionalidades Futuras
 - **Dashboard Visual:** Painel interativo com gráficos de desempenho financeiro.
 - **Importação Semi-Automática:** Leitura de extratos bancários para alimentar o sistema sem digitação manual.
 - **Previsão de Saldo com IA:** Integração com um modelo de Inteligência Artificial (LLM) local para analisar o histórico e realizar previsões de cenários e saldos futuros.

@@ -32,6 +32,29 @@ export default function Component() {
     const d = new Date(); d.setMonth(d.getMonth() + 1, 0); return d.toISOString().split('T')[0];
   });
   const [exportFormat, setExportFormat] = useState('csv');
+  const [exportInclude, setExportInclude] = useState('all');
+
+  const [predictType, setPredictType] = useState('balance');
+  const [predictHorizon, setPredictHorizon] = useState(3);
+  const [predictData, setPredictData] = useState<any>(null);
+  const [isPredicting, setIsPredicting] = useState(false);
+  const [predictError, setPredictError] = useState('');
+
+  const handleGetForecast = async () => {
+    setIsPredicting(true);
+    setPredictError('');
+    setPredictData(null);
+    try {
+      const res = await fetchApi(`/api/llm/predict?type=${predictType}&horizon=${predictHorizon}`);
+      const data = await res.json();
+      setPredictData(data);
+    } catch (e: any) {
+      console.error(e);
+      setPredictError(e.message || 'Erro ao gerar previsão');
+    } finally {
+      setIsPredicting(false);
+    }
+  };
 
   const [importingStatement, setImportingStatement] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -456,7 +479,8 @@ export default function Component() {
       const endDate = new Date(exportEnd + 'T23:59:59');
 
       const periodTxs = txs.filter((t: any) => {
-        if (t.type !== 'tx' || t.isPending) return false;
+        if (t.type !== 'tx') return false;
+        if (exportInclude === 'completed' && t.isPending) return false;
         const td = new Date(t.dateObj);
         return td >= startDate && td <= endDate;
       });
@@ -566,6 +590,36 @@ export default function Component() {
     catTotals[key].count += 1;
   });
   const sortedCats = Object.values(catTotals).sort((a: any, b: any) => b.total - a.total);
+
+  // Previsão IA Chart Data Construction
+  const histPoints = last6Months.slice(-4).map(m => {
+    let val = 0;
+    if (predictType === 'income') val = m.income;
+    else if (predictType === 'expense') val = m.expense;
+    else val = m.net;
+    return {
+      month: m.month,
+      value: val,
+      isForecast: false
+    };
+  });
+
+  const forecastPoints = predictData ? predictData.predictions.map((p: any) => {
+    const parts = p.month.split('/');
+    let monthLabel = p.month;
+    if (parts.length === 2) {
+      const d = new Date(parseInt(parts[1]), parseInt(parts[0]) - 1, 1);
+      monthLabel = d.toLocaleDateString('pt-BR', { month: 'short' });
+    }
+    return {
+      month: monthLabel,
+      value: p.predicted,
+      isForecast: true
+    };
+  }) : [];
+
+  const allChartPoints = [...histPoints, ...forecastPoints];
+  const maxPredictChartVal = Math.max(1, ...allChartPoints.map(p => Math.abs(p.value)));
 
   return (
     <>
@@ -724,10 +778,12 @@ export default function Component() {
                 <div className="page-header" style={{ paddingBottom: '16px' }}>
                   <div className="page-title">Relatórios</div>
                 </div>
-                <div className="sub-nav">
+                <div className="sub-nav" style={{ overflowX: 'auto', scrollbarWidth: 'none' }}>
                   <div className={`sub-tab ${reportTab === 'cashflow' ? 'active' : ''}`} onClick={() => setReportTab('cashflow')}>Fluxo de caixa</div>
                   <div className={`sub-tab ${reportTab === 'categories' ? 'active' : ''}`} onClick={() => setReportTab('categories')}>Por categoria</div>
                   <div className={`sub-tab ${reportTab === 'export' ? 'active' : ''}`} onClick={() => setReportTab('export')}>Importar / Exportar</div>
+                  <div className={`sub-tab ${reportTab === 'prediction' ? 'active' : ''}`} onClick={() => setReportTab('prediction')}>Previsão IA</div>
+                  <div className={`sub-tab ${reportTab === 'export' ? 'active' : ''}`} onClick={() => setReportTab('export')}>Exportar</div>
                 </div>
                 
                 {reportTab === 'cashflow' && (
@@ -842,9 +898,9 @@ export default function Component() {
                       </div>
                       <div className="field">
                         <div className="field-label">Incluir</div>
-                        <select>
-                          <option>Todas as transações</option>
-                          <option>Apenas concluídas</option>
+                        <select value={exportInclude} onChange={e => setExportInclude(e.target.value)}>
+                          <option value="all">Todas as transações</option>
+                          <option value="completed">Apenas concluídas</option>
                         </select>
                       </div>
                       <div className="field">
@@ -859,6 +915,179 @@ export default function Component() {
                         Baixar relatório
                       </button>
                     </div>
+                  </div>
+                )}
+
+                {reportTab === 'prediction' && (
+                  <div className="panel active" style={{ padding: '16px 24px 24px' }}>
+                    <div className="predict-header" style={{ marginBottom: '14px' }}>
+                      <div className="predict-title-ia" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 700, color: 'var(--accent)' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                        Previsão de Fluxo com IA
+                      </div>
+                      <div className="predict-desc" style={{ fontSize: '11px', color: 'var(--text-2)', marginTop: '4px', lineHeight: '1.4' }}>
+                        Alimentado por <strong>Amazon Chronos T5</strong>. Analisa suas transações concluídas para projetar os próximos meses.
+                      </div>
+                    </div>
+
+                    <div className="predict-config" style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+                      <div className="field" style={{ flex: 1, marginBottom: 0 }}>
+                        <div className="field-label" style={{ fontSize: '9px' }}>Tipo de Projeção</div>
+                        <select value={predictType} onChange={e => { setPredictType(e.target.value); setPredictData(null); }} style={{ padding: '8px 10px', fontSize: '12px' }}>
+                          <option value="balance">Saldo Líquido</option>
+                          <option value="income">Receitas (Entradas)</option>
+                          <option value="expense">Despesas (Saídas)</option>
+                        </select>
+                      </div>
+                      <div className="field" style={{ flex: 1, marginBottom: 0 }}>
+                        <div className="field-label" style={{ fontSize: '9px' }}>Horizonte</div>
+                        <select value={predictHorizon} onChange={e => { setPredictHorizon(Number(e.target.value)); setPredictData(null); }} style={{ padding: '8px 10px', fontSize: '12px' }}>
+                          <option value={3}>3 meses</option>
+                          <option value={6}>6 meses</option>
+                          <option value={12}>12 meses</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {!predictData && !isPredicting && (
+                      <button className="btn-predict" onClick={handleGetForecast} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', padding: '12px', background: 'var(--accent)', color: '#030D08', border: 'none', borderRadius: 'var(--radius-sm)', fontWeight: 700, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s' }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
+                        Analisar e Projetar
+                      </button>
+                    )}
+
+                    {isPredicting && (
+                      <div className="predict-loading-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '30px 10px', gap: '12px', background: 'var(--surface2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                        <div className="predict-spinner"></div>
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)' }}>Processando inteligência artificial...</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-3)' }}>Isso pode levar alguns segundos na primeira execução.</div>
+                      </div>
+                    )}
+
+                    {predictError && (
+                      <div className="predict-error-container" style={{ padding: '14px', background: 'rgba(255,92,106,0.08)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(255,92,106,0.3)', color: '#ffa0a8', fontSize: '12px', lineHeight: '1.5', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '14px' }}>⚠️</span> Falha na Previsão
+                        </div>
+                        <div>{predictError}</div>
+                        <button className="btn btn-danger" onClick={handleGetForecast} style={{ fontSize: '11px', padding: '6px 12px', width: 'fit-content', marginTop: '4px' }}>Tentar Novamente</button>
+                      </div>
+                    )}
+
+                    {predictData && (
+                      <div className="predict-results" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        
+                        {/* Gráfico Híbrido */}
+                        <div className="predict-chart-box" style={{ background: 'var(--surface2)', padding: '14px 14px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                          <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: '16px' }}>
+                            Tendência: Histórico vs Projeção IA
+                          </div>
+                          
+                          <div className="predict-bar-chart" style={{ display: 'flex', alignItems: 'flex-end', gap: '5px', height: '110px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
+                            {allChartPoints.map((p, idx) => {
+                              const heightPct = (Math.abs(p.value) / maxPredictChartVal) * 75;
+                              const isNegative = p.value < 0;
+                              let barColor = p.isForecast ? 'rgba(0, 214, 143, 0.45)' : 'var(--text-2)';
+                              if (predictType === 'expense') {
+                                barColor = p.isForecast ? 'rgba(255, 92, 106, 0.5)' : 'var(--debit)';
+                              } else if (predictType === 'balance') {
+                                barColor = isNegative ? 'var(--debit)' : 'var(--accent)';
+                              }
+                              
+                              return (
+                                <div key={idx} className="predict-bar-col" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', minWidth: '32px' }}>
+                                  <div className="predict-bar-wrap" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '80px', position: 'relative' }}>
+                                    <span style={{ fontSize: '8px', fontWeight: 700, color: p.isForecast ? 'var(--accent)' : 'var(--text-2)', marginBottom: '2px', fontFamily: '"Roboto",sans-serif' }}>
+                                      {isNegative ? '-' : ''}{Math.abs(p.value) >= 1000 ? `${(Math.abs(p.value)/1000).toFixed(1)}k` : Math.abs(p.value).toFixed(0)}
+                                    </span>
+                                    <div 
+                                      className={`predict-bar-seg ${p.isForecast ? 'forecast' : ''}`} 
+                                      style={{ 
+                                        width: '100%', 
+                                        height: `${Math.max(4, heightPct)}px`, 
+                                        background: barColor, 
+                                        borderRadius: '3px',
+                                        border: p.isForecast ? '1.5px dashed var(--accent)' : 'none',
+                                        boxShadow: p.isForecast ? '0 0 8px rgba(0, 214, 143, 0.25)' : 'none'
+                                      }}
+                                    ></div>
+                                  </div>
+                                  <div className="predict-bar-month" style={{ fontSize: '9px', fontWeight: 600, color: p.isForecast ? 'var(--accent)' : 'var(--text-3)', textTransform: 'capitalize' }}>
+                                    {p.month.replace('.', '')}
+                                    {p.isForecast && <span style={{ fontSize: '7px', display: 'block', color: 'var(--accent)', fontWeight: 800 }}>IA</span>}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          
+                          <div className="chart-legend" style={{ display: 'flex', gap: '10px', marginTop: '12px', justifyContent: 'center' }}>
+                            <div className="legend-item" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '9px', color: 'var(--text-2)' }}>
+                              <div className="legend-dot" style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--text-2)' }}></div> Histórico
+                            </div>
+                            <div className="legend-item" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '9px', color: 'var(--accent)' }}>
+                              <div className="legend-dot" style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 6px var(--accent)' }}></div> Previsão IA
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Insights Inteligentes */}
+                        <div className="predict-insights-card" style={{ display: 'flex', gap: '10px', background: 'var(--surface2)', padding: '12px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                          <span style={{ fontSize: '18px' }}>🤖</span>
+                          <div style={{ fontSize: '11px', lineHeight: '1.4' }}>
+                            <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: '3px' }}>Avaliação da IA</div>
+                            {(() => {
+                              const histAvg = histPoints.reduce((acc: number, p: any) => acc + p.value, 0) / Math.max(1, histPoints.length);
+                              const foreAvg = forecastPoints.reduce((acc: number, p: any) => acc + p.value, 0) / Math.max(1, forecastPoints.length);
+                              const diff = foreAvg - histAvg;
+                              const pct = histAvg !== 0 ? (diff / Math.abs(histAvg)) * 100 : 0;
+                              
+                              if (predictType === 'balance') {
+                                if (foreAvg > histAvg) {
+                                  return `Sua tendência de saldo líquido aponta para um crescimento de cerca de ${Math.abs(pct).toFixed(1)}% em comparação à média recente. Isso indica uma situação saudável no fluxo de caixa futuro.`;
+                                } else {
+                                  return `A projeção do saldo líquido indica uma queda de ${Math.abs(pct).toFixed(1)}% em relação à média recente. Considere revisar despesas futuras ou otimizar seus recebimentos para mitigar o impacto.`;
+                                }
+                              } else if (predictType === 'income') {
+                                if (foreAvg > histAvg) {
+                                  return `Receitas futuras em alta! Projetamos um ganho médio de R$ ${foreAvg.toFixed(2)} por mês, representando uma variação positiva de ${Math.abs(pct).toFixed(1)}%.`;
+                                } else {
+                                  return `Fique atento. O modelo prevê uma redução nas receitas mensais de cerca de ${Math.abs(pct).toFixed(1)}% nos próximos meses. Planeje novas frentes de ganho.`;
+                                }
+                              } else { // expense
+                                if (foreAvg > histAvg) {
+                                  return `Atenção: tendência de aumento de despesas futuras em torno de ${Math.abs(pct).toFixed(1)}%. Recomendamos revisar assinaturas e gastos variáveis.`;
+                                } else {
+                                  return `Ótima notícia! A projeção indica que suas despesas devem cair ${Math.abs(pct).toFixed(1)}% nos meses seguintes. Continue com a boa disciplina financeira.`;
+                                }
+                              }
+                            })()}
+                          </div>
+                        </div>
+
+                        {/* Listagem Detalhada */}
+                        <div className="predict-table-box" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.07em', textTransform: 'uppercase', paddingLeft: '4px' }}>
+                            Valores Projetados
+                          </div>
+                          {predictData.predictions.map((p: any, idx: number) => (
+                            <div key={idx} className="predict-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text)' }}>Mês {p.month}</div>
+                                <div style={{ fontSize: '9px', color: 'var(--accent)', fontWeight: 600 }}>Projeção Confiável</div>
+                              </div>
+                              <div style={{ marginLeft: 'auto', fontFamily: '"Roboto",sans-serif', fontSize: '13px', fontWeight: 700, color: predictType === 'expense' ? 'var(--debit)' : 'var(--accent)' }}>
+                                R$ {p.predicted.toFixed(2).replace('.', ',')}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        
+                        <button className="btn btn-ghost" onClick={() => setPredictData(null)} style={{ fontSize: '12px', padding: '10px' }}>
+                          Limpar e Configurar Nova Análise
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
