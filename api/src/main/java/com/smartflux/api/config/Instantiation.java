@@ -62,6 +62,7 @@ public class Instantiation implements CommandLineRunner {
                 List<Category> categories = new ArrayList<>();
                 for (int i = 0; i < catNames.length; i++) {
                         categories.add(new Category(mainUser, catNames[i], catColors[i]));
+                }
                 java.util.Set<String> generatedNames = new java.util.HashSet<>();
                 while (categories.size() < 10) {
                         String name = faker.commerce().department();
