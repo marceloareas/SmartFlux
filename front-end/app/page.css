@@ -1056,6 +1056,7 @@ input:-webkit-autofill:active{
   .toast-container { bottom: 80px; right: 12px; left: 12px; }
   .toast { min-width: auto; }
   .preview-modal { max-height: 90vh; }
+}
 /* ── Previsão IA ── */
 .btn-predict {
   background: var(--accent);
