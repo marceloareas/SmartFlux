@@ -1,10 +1,13 @@
 package com.smartflux.api.service;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.UUID;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.io.IOException;
+import org.springframework.web.multipart.MultipartFile;
 
 import org.springframework.security.core.context.SecurityContextHolder;
 import com.smartflux.api.config.JWTUserData;
@@ -26,6 +29,7 @@ public class TransactionService {
     private final TransactionRepository transactionRepository;
     private final AccountService accountService;
     private final CategoryService categoryService;
+    private final StatementParserService statementParserService;
 
     private UUID getCurrentUserId() {
         JWTUserData userData = (JWTUserData) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -86,6 +90,40 @@ public class TransactionService {
         Transaction result = transactionRepository.save(transaction);
         log.info("Transação atualizada com sucesso no banco de dados. ID: {}", result.getId());
         return result;
+    }
+
+    @Transactional
+    public List<Transaction> previewFromStatement(MultipartFile file, UUID accountId) throws IOException {
+        com.smartflux.api.model.Account account = accountService.findAccountById(accountId);
+        
+        if (!account.getUser().getId().equals(getCurrentUserId())) {
+            throw new RuntimeException("Conta não pertence ao usuário atual");
+        }
+
+        return statementParserService.parseTransactions(file, account);
+    }
+
+    @Transactional
+    public List<Transaction> importFromStatement(MultipartFile file, UUID accountId, List<Integer> selectedIndices) throws IOException {
+        com.smartflux.api.model.Account account = accountService.findAccountById(accountId);
+        
+        if (!account.getUser().getId().equals(getCurrentUserId())) {
+            throw new RuntimeException("Conta não pertence ao usuário atual");
+        }
+
+        List<Transaction> transactions = statementParserService.parseTransactions(file, account);
+        
+        if (selectedIndices != null && !selectedIndices.isEmpty()) {
+            List<Transaction> filtered = new ArrayList<>();
+            for (int i = 0; i < transactions.size(); i++) {
+                if (selectedIndices.contains(i)) {
+                    filtered.add(transactions.get(i));
+                }
+            }
+            transactions = filtered;
+        }
+
+        return transactionRepository.saveAll(transactions);
     }
 
     public String exportReportAsCsv(Integer month, Integer year, String startDate, String endDate) {
