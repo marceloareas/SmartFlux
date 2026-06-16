@@ -127,6 +127,18 @@ export default function Component() {
       window.location.href = '/login';
       return;
     }
+    
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (tabParam) {
+        const parsed = parseInt(tabParam, 10);
+        if (!isNaN(parsed) && parsed >= 0 && parsed <= 3) {
+          setActiveTab(parsed);
+        }
+      }
+    }
+
     const loadData = async () => {
       try {
         const usersRes = await fetchApi('/api/users/me');
@@ -196,6 +208,19 @@ export default function Component() {
       setConfirmOpen(false);
       if (account) fetchTransactions(account.id);
     } catch (e) { console.error("Error deleting tx", e); }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetchApi('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: localStorage.getItem('refreshToken') })
+      });
+    } catch (e) { }
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    window.location.href = '/login';
   };
 
   const handleCreateCategory = async () => {
@@ -398,8 +423,61 @@ export default function Component() {
         <div className="bg-glow bg-glow-1"></div>
         <div className="bg-glow bg-glow-2"></div>
       </div>
-      <div className="shell">
-        <div className="phone" id="phone">
+      <div className="app-container">
+        {/* Sidebar */}
+        <aside className="sidebar">
+          <div className="sidebar-brand">
+            <div className="logo-mark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#030D08" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>
+            </div>
+            <span className="logo-name">SmartFlux</span>
+          </div>
+          
+          <button className="sidebar-add-btn" onClick={openAddSheet}>
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" stroke="currentColor" style={{ width: 16, height: 16 }}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            Nova transação
+          </button>
+
+          <nav className="sidebar-nav">
+            <div className={`sidebar-nav-item ${activeTab === 0 ? 'active' : ''}`} onClick={() => setActiveTab(0)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" /><path d="M9 21V12h6v9" /></svg>
+              <span>Início</span>
+            </div>
+            <div className={`sidebar-nav-item ${activeTab === 1 ? 'active' : ''}`} onClick={() => setActiveTab(1)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>
+              <span>Transações</span>
+            </div>
+            <div className={`sidebar-nav-item ${activeTab === 2 ? 'active' : ''}`} onClick={() => setActiveTab(2)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
+              <span>Futuro</span>
+            </div>
+            <div className={`sidebar-nav-item ${activeTab === 3 ? 'active' : ''}`} onClick={() => setActiveTab(3)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
+              <span>Relatórios</span>
+            </div>
+          </nav>
+
+          <div className="sidebar-footer">
+            <div className="sidebar-user" onClick={() => window.location.href = "/profile"}>
+              <div className="avatar-btn" style={{ fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface2)', border: '2px solid var(--accent)', borderRadius: '50%', width: '32px', height: '32px', userSelect: 'none', overflow: 'hidden', cursor: 'pointer', flexShrink: 0 }}>
+                {currentUser?.avatarUrl ? (
+                  <img src={currentUser.avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <span style={{ lineHeight: 1 }}>{currentUser?.name ? getAnimalAvatar(currentUser.name) : '🐶'}</span>
+                )}
+              </div>
+              <div className="sidebar-user-info">
+                <div className="sidebar-user-name">{currentUser?.name || 'SmartUser'}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                  <span className="sidebar-user-email" style={{ flex: 1 }}>{currentUser?.email || ''}</span>
+                  <span onClick={(e) => { e.stopPropagation(); handleLogout(); }} style={{ fontSize: '11px', color: 'var(--debit)', cursor: 'pointer', fontWeight: 600, marginLeft: '8px', textDecoration: 'underline' }}>Sair</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <main className="main-content" id="phone">
           <div className="topbar">
             <div className="logo">
               <div className="logo-mark">
@@ -440,51 +518,53 @@ export default function Component() {
                   </div>
                 </div>
 
-                <div className="section">
-                  <div className="section-header">
-                    <div className="section-title">Próximos vencimentos</div>
-                    <a className="section-link" onClick={() => setActiveTab(2)}>Ver tudo →</a>
-                  </div>
-                  <div className="upcoming-list">
-                    {upcomingTxs.map((t: any) => {
-                      const overdue = new Date(t.dateObj).setHours(0,0,0,0) < new Date().setHours(0,0,0,0);
-                      return (
-                        <div key={t.id} className={`upcoming-card ${overdue ? 'overdue' : t.dir}`} onClick={() => { setDetail(t); setDetailOpen(true); }}>
-                          <div className="uc-icon" style={{ background: t.bg, color: t.color }}>{t.icon}</div>
-                          <div className="uc-body">
-                            <div className="uc-desc">{t.desc}</div>
-                            <div className="uc-meta">{t.category ? `${t.category} · ` : ''}{new Date(t.dateObj).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</div>
+                <div className="dashboard-grid">
+                  <div className="section">
+                    <div className="section-header">
+                      <div className="section-title">Próximos vencimentos</div>
+                      <a className="section-link" onClick={() => setActiveTab(2)}>Ver tudo →</a>
+                    </div>
+                    <div className="upcoming-list">
+                      {upcomingTxs.map((t: any) => {
+                        const overdue = new Date(t.dateObj).setHours(0,0,0,0) < new Date().setHours(0,0,0,0);
+                        return (
+                          <div key={t.id} className={`upcoming-card ${overdue ? 'overdue' : t.dir}`} onClick={() => { setDetail(t); setDetailOpen(true); }}>
+                            <div className="uc-icon" style={{ background: t.bg, color: t.color }}>{t.icon}</div>
+                            <div className="uc-body">
+                              <div className="uc-desc">{t.desc}</div>
+                              <div className="uc-meta">{t.category ? `${t.category} · ` : ''}{new Date(t.dateObj).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</div>
+                            </div>
+                            {overdue && <div className="overdue-pill">Atrasada</div>}
+                            <div className="uc-amount" style={{ color: overdue ? 'var(--warning)' : t.dir === 'debit' ? 'var(--debit)' : 'var(--credit)' }}>
+                              {t.dir === 'debit' ? '- ' : '+ '}R$ {t.rawAmount.toFixed(2).replace('.', ',')}
+                            </div>
                           </div>
-                          {overdue && <div className="overdue-pill">Atrasada</div>}
-                          <div className="uc-amount" style={{ color: overdue ? 'var(--warning)' : t.dir === 'debit' ? 'var(--debit)' : 'var(--credit)' }}>
-                            {t.dir === 'debit' ? '- ' : '+ '}R$ {t.rawAmount.toFixed(2).replace('.', ',')}
-                          </div>
-                        </div>
-                      )
-                    })}
-                    {upcomingTxs.length === 0 && <div style={{textAlign: 'center', color: 'var(--text-3)', padding: '10px', fontSize: '13px'}}>Nenhum vencimento futuro.</div>}
+                        )
+                      })}
+                      {upcomingTxs.length === 0 && <div style={{textAlign: 'center', color: 'var(--text-3)', padding: '10px', fontSize: '13px'}}>Nenhum vencimento futuro.</div>}
+                    </div>
                   </div>
-                </div>
 
-                <div className="section" style={{ marginTop: '20px', paddingBottom: '20px' }}>
-                  <div className="section-header">
-                    <div className="section-title">Transações recentes</div>
-                    <a className="section-link" onClick={() => setActiveTab(1)}>Ver tudo →</a>
-                  </div>
-                  <div className="recent-list">
-                    {recentTxs.map((t: any) => (
-                      <div key={t.id} className={`tx-card ${t.dir}`} onClick={() => { setDetail(t); setDetailOpen(true); }}>
-                        <div className="tx-card-icon" style={{ background: t.bg, color: t.color }}>{t.icon}</div>
-                        <div className="tx-card-body">
-                          <div className="tx-card-desc">{t.desc}</div>
-                          <div className="tx-card-meta">{t.category ? `${t.category} · ` : ''}{new Date(t.dateObj).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</div>
+                  <div className="section" style={{ marginTop: '20px', paddingBottom: '20px' }}>
+                    <div className="section-header">
+                      <div className="section-title">Transações recentes</div>
+                      <a className="section-link" onClick={() => setActiveTab(1)}>Ver tudo →</a>
+                    </div>
+                    <div className="recent-list">
+                      {recentTxs.map((t: any) => (
+                        <div key={t.id} className={`tx-card ${t.dir}`} onClick={() => { setDetail(t); setDetailOpen(true); }}>
+                          <div className="tx-card-icon" style={{ background: t.bg, color: t.color }}>{t.icon}</div>
+                          <div className="tx-card-body">
+                            <div className="tx-card-desc">{t.desc}</div>
+                            <div className="tx-card-meta">{t.category ? `${t.category} · ` : ''}{new Date(t.dateObj).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</div>
+                          </div>
+                          <div className="tx-card-amount">
+                            {t.dir === 'debit' ? '- ' : '+ '}{t.amount.replace('R$ ', '')}
+                          </div>
                         </div>
-                        <div className="tx-card-amount">
-                          {t.dir === 'debit' ? '- ' : '+ '}{t.amount.replace('R$ ', '')}
-                        </div>
-                      </div>
-                    ))}
-                    {recentTxs.length === 0 && <div style={{textAlign: 'center', color: 'var(--text-3)', padding: '10px', fontSize: '13px'}}>Nenhuma transação recente.</div>}
+                      ))}
+                      {recentTxs.length === 0 && <div style={{textAlign: 'center', color: 'var(--text-3)', padding: '10px', fontSize: '13px'}}>Nenhuma transação recente.</div>}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -528,44 +608,46 @@ export default function Component() {
                       </div>
                     </div>
 
-                    <div className="chart-wrap">
-                      <div className="chart-title">Receitas vs despesas (6 meses)</div>
-                      <div className="bar-chart">
-                        {last6Months.map((m, i) => (
-                          <div key={i} className={`bar-col ${reportPeriod === '6months' || i === selectedMonthIdx ? 'current' : ''}`} onClick={() => { setReportPeriod('monthly'); setSelectedMonthIdx(i); }} style={{ cursor: 'pointer' }}>
-                            <div className="bar-wrap">
-                              <div className="bar-seg income" style={{ height: `${Math.max(4, (m.income / maxChartVal) * 70)}px` }}></div>
-                              <div className="bar-seg expense" style={{ height: `${Math.max(4, (m.expense / maxChartVal) * 70)}px` }}></div>
-                            </div>
-                            <div className="bar-month" style={{textTransform:'capitalize'}}>{m.month.replace('.','')}</div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="chart-legend">
-                        <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--credit)' }}></div>Receitas</div>
-                        <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--debit)' }}></div>Despesas</div>
-                      </div>
-                    </div>
-
-                    {reportPeriod === '6months' && (
-                      <div className="breakdown-list">
-                        <div style={{fontSize:'11px',fontWeight:600,letterSpacing:'.07em',textTransform:'uppercase',color:'var(--text-3)',marginBottom:'2px'}}>Líquido por mês</div>
-                        {last6Months.slice().reverse().map((m, i) => {
-                          const maxNet = Math.max(1, ...last6Months.map(x => Math.abs(x.net)));
-                          const pct = Math.max(2, (Math.abs(m.net) / maxNet) * 100);
-                          const isPos = m.net >= 0;
-                          return (
-                            <div key={i} className="breakdown-row">
-                              <div className="breakdown-month" style={{textTransform:'capitalize'}}>{m.month.replace('.','')}</div>
-                              <div className="breakdown-bar-wrap"><div className="breakdown-bar-fill" style={{ width: `${pct}%`, background: isPos ? 'var(--accent)' : 'var(--debit)' }}></div></div>
-                              <div className="breakdown-val" style={{ color: isPos ? 'var(--accent)' : 'var(--debit)' }}>
-                                {isPos ? '+' : '-'}R$ {Math.abs(m.net).toFixed(2).replace('.', ',')}
+                    <div className="report-desktop-split">
+                      <div className="chart-wrap">
+                        <div className="chart-title">Receitas vs despesas (6 meses)</div>
+                        <div className="bar-chart">
+                          {last6Months.map((m, i) => (
+                            <div key={i} className={`bar-col ${reportPeriod === '6months' || i === selectedMonthIdx ? 'current' : ''}`} onClick={() => { setReportPeriod('monthly'); setSelectedMonthIdx(i); }} style={{ cursor: 'pointer' }}>
+                              <div className="bar-wrap">
+                                <div className="bar-seg income" style={{ height: `${Math.max(4, (m.income / maxChartVal) * 70)}px` }}></div>
+                                <div className="bar-seg expense" style={{ height: `${Math.max(4, (m.expense / maxChartVal) * 70)}px` }}></div>
                               </div>
+                              <div className="bar-month" style={{textTransform:'capitalize'}}>{m.month.replace('.','')}</div>
                             </div>
-                          );
-                        })}
+                          ))}
+                        </div>
+                        <div className="chart-legend">
+                          <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--credit)' }}></div>Receitas</div>
+                          <div className="legend-item"><div className="legend-dot" style={{ background: 'var(--debit)' }}></div>Despesas</div>
+                        </div>
                       </div>
-                    )}
+
+                      {reportPeriod === '6months' && (
+                        <div className="breakdown-list">
+                          <div style={{fontSize:'11px',fontWeight:600,letterSpacing:'.07em',textTransform:'uppercase',color:'var(--text-3)',marginBottom:'2px'}}>Líquido por mês</div>
+                          {last6Months.slice().reverse().map((m, i) => {
+                            const maxNet = Math.max(1, ...last6Months.map(x => Math.abs(x.net)));
+                            const pct = Math.max(2, (Math.abs(m.net) / maxNet) * 100);
+                            const isPos = m.net >= 0;
+                            return (
+                              <div key={i} className="breakdown-row">
+                                <div className="breakdown-month" style={{textTransform:'capitalize'}}>{m.month.replace('.','')}</div>
+                                <div className="breakdown-bar-wrap"><div className="breakdown-bar-fill" style={{ width: `${pct}%`, background: isPos ? 'var(--accent)' : 'var(--debit)' }}></div></div>
+                                <div className="breakdown-val" style={{ color: isPos ? 'var(--accent)' : 'var(--debit)' }}>
+                                  {isPos ? '+' : '-'}R$ {Math.abs(m.net).toFixed(2).replace('.', ',')}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -843,7 +925,7 @@ export default function Component() {
             </div>
           </div>
 
-        </div>
+        </main>
       </div>
     </>
   );

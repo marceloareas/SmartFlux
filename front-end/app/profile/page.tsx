@@ -205,8 +205,61 @@ export default function Profile() {
         <div className="bg-glow bg-glow-1"></div>
         <div className="bg-glow bg-glow-2"></div>
       </div>
-      <div className="shell">
-        <div className="phone">
+      <div className="app-container">
+        {/* Sidebar */}
+        <aside className="sidebar">
+          <div className="sidebar-brand">
+            <div className="logo-mark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#030D08" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>
+            </div>
+            <span className="logo-name">SmartFlux</span>
+          </div>
+          
+          <button className="sidebar-add-btn" onClick={() => window.location.href = "/?tab=0"}>
+            <svg viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" stroke="currentColor" style={{ width: 16, height: 16 }}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            Nova transação
+          </button>
+
+          <nav className="sidebar-nav">
+            <div className="sidebar-nav-item" onClick={() => window.location.href = "/?tab=0"}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" /><path d="M9 21V12h6v9" /></svg>
+              <span>Início</span>
+            </div>
+            <div className="sidebar-nav-item" onClick={() => window.location.href = "/?tab=1"}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>
+              <span>Transações</span>
+            </div>
+            <div className="sidebar-nav-item" onClick={() => window.location.href = "/?tab=2"}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
+              <span>Futuro</span>
+            </div>
+            <div className="sidebar-nav-item" onClick={() => window.location.href = "/?tab=3"}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
+              <span>Relatórios</span>
+            </div>
+          </nav>
+
+          <div className="sidebar-footer">
+            <div className="sidebar-user active" onClick={() => window.location.href = "/profile"}>
+              <div className="avatar-btn" style={{ fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface2)', border: '2px solid var(--accent)', borderRadius: '50%', width: '32px', height: '32px', userSelect: 'none', overflow: 'hidden', cursor: 'pointer', flexShrink: 0 }}>
+                {displaySrc ? (
+                  <img src={displaySrc} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <span style={{ lineHeight: 1 }}>{name ? getAnimalAvatar(name) : '🐶'}</span>
+                )}
+              </div>
+              <div className="sidebar-user-info">
+                <div className="sidebar-user-name">{name || 'SmartUser'}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                  <span className="sidebar-user-email" style={{ flex: 1 }}>{email || ''}</span>
+                  <span onClick={(e) => { e.stopPropagation(); handleLogout(); }} style={{ fontSize: '11px', color: 'var(--debit)', cursor: 'pointer', fontWeight: 600, marginLeft: '8px', textDecoration: 'underline' }}>Sair</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <main className="main-content" id="phone">
           <div className="topbar" style={{ justifyContent: 'space-between', padding: '0 24px' }}>
             <div className="logo" onClick={() => window.location.href = "/"} style={{ cursor: 'pointer' }}>
               <div className="logo-mark">
@@ -428,7 +481,7 @@ export default function Profile() {
               </div>
             </form>
           </div>
-        </div>
+        </main>
       </div>
 
       {/* Micro-styles for avatar hover/spinner */}

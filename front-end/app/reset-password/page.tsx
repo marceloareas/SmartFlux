@@ -65,7 +65,7 @@ function ResetPasswordForm() {
                 <div className="bg-glow bg-glow-2"></div>
             </div>
             <div className="shell">
-                <div className="phone">
+                <div className="phone auth-card">
                     <div className="screen" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 24px' }}>
 
