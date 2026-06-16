@@ -32,6 +32,7 @@ export default function Component() {
     const d = new Date(); d.setMonth(d.getMonth() + 1, 0); return d.toISOString().split('T')[0];
   });
   const [exportFormat, setExportFormat] = useState('csv');
+  const [exportInclude, setExportInclude] = useState('all');
 
   const [predictType, setPredictType] = useState('balance');
   const [predictHorizon, setPredictHorizon] = useState(3);
@@ -302,7 +303,8 @@ export default function Component() {
       const endDate = new Date(exportEnd + 'T23:59:59');
 
       const periodTxs = txs.filter((t: any) => {
-        if (t.type !== 'tx' || t.isPending) return false;
+        if (t.type !== 'tx') return false;
+        if (exportInclude === 'completed' && t.isPending) return false;
         const td = new Date(t.dateObj);
         return td >= startDate && td <= endDate;
       });
@@ -662,9 +664,9 @@ export default function Component() {
                       </div>
                       <div className="field">
                         <div className="field-label">Incluir</div>
-                        <select>
-                          <option>Todas as transações</option>
-                          <option>Apenas concluídas</option>
+                        <select value={exportInclude} onChange={e => setExportInclude(e.target.value)}>
+                          <option value="all">Todas as transações</option>
+                          <option value="completed">Apenas concluídas</option>
                         </select>
                       </div>
                       <div className="field">
