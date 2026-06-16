@@ -46,7 +46,7 @@ services:
 
   llm-service:
     build:
-      context: ./llm-service
+      context: ./llm
       dockerfile: Dockerfile
     container_name: smartflux_llm_service
     ports:

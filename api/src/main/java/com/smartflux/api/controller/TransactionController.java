@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import com.smartflux.api.model.Transaction;
@@ -66,6 +67,35 @@ public class TransactionController {
         log.info("Recebendo requisição para atualizar transação ID {}: {}", id, transaction);
         Transaction updatedTransaction = transactionService.updateTransaction(id, transaction);
         return ResponseEntity.ok().body(updatedTransaction);
+    }
+
+    @PostMapping(value = "/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> previewImport(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("accountId") UUID accountId) {
+        log.info("Recebendo requisição para pré-visualizar importação de arquivo para a conta {}", accountId);
+        try {
+            List<Transaction> preview = transactionService.previewFromStatement(file, accountId);
+            return ResponseEntity.ok().body(preview);
+        } catch (Exception e) {
+            log.error("Erro ao pré-visualizar arquivo", e);
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage() != null ? e.getMessage() : "Erro desconhecido"));
+        }
+    }
+
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> importFromStatement(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("accountId") UUID accountId,
+            @RequestParam(value = "selectedIndices", required = false) List<Integer> selectedIndices) {
+        log.info("Recebendo requisição para importar transações via arquivo (OFX/XML) para a conta {} com {} indices selecionados", accountId, selectedIndices != null ? selectedIndices.size() : "todos os");
+        try {
+            List<Transaction> imported = transactionService.importFromStatement(file, accountId, selectedIndices);
+            return ResponseEntity.ok().body(imported);
+        } catch (Exception e) {
+            log.error("Erro ao importar arquivo", e);
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage() != null ? e.getMessage() : "Erro desconhecido"));
+        }
     }
 
     @GetMapping("/export")

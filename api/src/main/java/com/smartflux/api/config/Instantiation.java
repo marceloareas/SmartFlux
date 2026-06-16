@@ -54,9 +54,11 @@ public class Instantiation implements CommandLineRunner {
                 accountRepository.saveAll(accounts);
 
                 // CATEGORY ------------------------------------------
+                String[] catNames = {"Alimentação", "Transporte", "Moradia", "Saúde", "Lazer", "Educação", "Vestuário", "Tecnologia", "Serviços", "Outros"};
+                String[] catColors = {"#FF5C6A", "#F5A623", "#8A6EED", "#37B9DD", "#5EC4A7", "#E8893C", "#A78BFA", "#34D399", "#FB7185", "#DC6450"};
                 List<Category> categories = new ArrayList<>();
-                for (int i = 0; i < 10; i++) {
-                        categories.add(new Category(mainUser, faker.commerce().department(), faker.color().hex()));
+                for (int i = 0; i < catNames.length; i++) {
+                        categories.add(new Category(mainUser, catNames[i], catColors[i]));
                 }
                 categoryRepository.saveAll(categories);
 

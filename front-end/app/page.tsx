@@ -33,6 +33,20 @@ export default function Component() {
   });
   const [exportFormat, setExportFormat] = useState('csv');
 
+  const [importingStatement, setImportingStatement] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Toast notifications
+  const [toasts, setToasts] = useState<{ id: number; type: 'success' | 'error' | 'warning'; title: string; msg: string; exiting?: boolean }[]>([]);
+  const toastIdRef = React.useRef(0);
+
+  // Import preview
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewTxs, setPreviewTxs] = useState<any[]>([]);
+  const [selectedTxIndices, setSelectedTxIndices] = useState<Set<number>>(new Set());
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
   const [newCatOpen, setNewCatOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [newCatColor, setNewCatColor] = useState('#5EC4A7');
@@ -75,7 +89,7 @@ export default function Component() {
       myTxs.sort((a: any, b: any) => new Date(b.competenceDate).getTime() - new Date(a.competenceDate).getTime());
 
       const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      today.setHours(23, 59, 59, 999);
 
       let currentMonth = '';
       const grouped: any[] = [];
@@ -120,6 +134,12 @@ export default function Component() {
       setTxs(grouped as any);
       setFlowTotal(total);
     } catch (e) { console.error('Error fetching txs:', e); }
+  };
+
+  const handleTabChange = (tabIdx: number) => {
+    setActiveTab(tabIdx);
+    setSheetOpen(false);
+    setDetailOpen(false);
   };
 
   useEffect(() => {
@@ -299,6 +319,137 @@ export default function Component() {
     }
   };
 
+  const showToast = (type: 'success' | 'error' | 'warning', title: string, msg: string) => {
+    const id = ++toastIdRef.current;
+    setToasts(prev => [...prev, { id, type, title, msg }]);
+    setTimeout(() => {
+      setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
+      setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 350);
+    }, 4500);
+  };
+
+  const dismissToast = (id: number) => {
+    setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 350);
+  };
+
+  const handleImportStatement = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    if (!file) return;
+
+    if (!account || !currentUser) {
+      showToast('warning', 'Faça login primeiro', 'Você precisa estar logado e ter uma conta ativa para importar um extrato.');
+      return;
+    }
+
+    setPreviewLoading(true);
+    setPendingFile(file);
+
+    try {
+      const token = localStorage.getItem('accessToken');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('accountId', account.id);
+
+      const res = await fetch('/api/transactions/import/preview', {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.length === 0) {
+          showToast('warning', 'Nenhuma transação encontrada', 'O arquivo foi lido, mas não contém transações reconhecíveis.');
+          setPendingFile(null);
+        } else {
+          setPreviewTxs(data);
+          setSelectedTxIndices(new Set(data.map((_: any, i: number) => i)));
+          setPreviewOpen(true);
+          setSheetOpen(false);
+        }
+      } else {
+        const errorData = await res.json().catch(() => ({ error: 'Erro desconhecido' }));
+        showToast('error', 'Erro ao ler arquivo', errorData.error || `Falha ao processar o arquivo (${res.status}).`);
+        setPendingFile(null);
+      }
+    } catch (err) {
+      showToast('error', 'Falha na conexão', 'Não foi possível conectar ao servidor. Verifique sua conexão.');
+      setPendingFile(null);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!pendingFile || !account) return;
+
+    setImportingStatement(true);
+
+    try {
+      const token = localStorage.getItem('accessToken');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const formData = new FormData();
+      formData.append('file', pendingFile);
+      formData.append('accountId', account.id);
+      Array.from(selectedTxIndices).forEach(idx => {
+        formData.append('selectedIndices', idx.toString());
+      });
+
+      const res = await fetch('/api/transactions/import', {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        showToast('success', 'Extrato importado!', `${data.length} transação(ões) foram adicionadas à sua conta com sucesso.`);
+        await fetchTransactions(account.id);
+        setPreviewOpen(false);
+        setPendingFile(null);
+        setPreviewTxs([]);
+        setSelectedTxIndices(new Set());
+      } else {
+        const errorData = await res.json().catch(() => ({ error: 'Erro desconhecido' }));
+        showToast('error', 'Erro ao importar', errorData.error || `Falha ao salvar as transações (${res.status}).`);
+      }
+    } catch (err) {
+      showToast('error', 'Falha na conexão', 'Não foi possível conectar ao servidor. Verifique sua conexão.');
+    } finally {
+      setImportingStatement(false);
+    }
+  };
+
+  const handleCancelPreview = () => {
+    setPreviewOpen(false);
+    setPendingFile(null);
+    setPreviewTxs([]);
+    setSelectedTxIndices(new Set());
+  };
+
+  const toggleTxSelection = (index: number) => {
+    const newSet = new Set(selectedTxIndices);
+    if (newSet.has(index)) newSet.delete(index);
+    else newSet.add(index);
+    setSelectedTxIndices(newSet);
+  };
+
+  const toggleAllTxs = () => {
+    if (selectedTxIndices.size === previewTxs.length) {
+      setSelectedTxIndices(new Set());
+    } else {
+      setSelectedTxIndices(new Set(previewTxs.map((_: any, i: number) => i)));
+    }
+  };
+
   const handleExportPdf = () => {
     try {
       const startDate = new Date(exportStart + 'T00:00:00');
@@ -439,19 +590,19 @@ export default function Component() {
           </button>
 
           <nav className="sidebar-nav">
-            <div className={`sidebar-nav-item ${activeTab === 0 ? 'active' : ''}`} onClick={() => setActiveTab(0)}>
+            <div className={`sidebar-nav-item ${activeTab === 0 ? 'active' : ''}`} onClick={() => handleTabChange(0)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" /><path d="M9 21V12h6v9" /></svg>
               <span>Início</span>
             </div>
-            <div className={`sidebar-nav-item ${activeTab === 1 ? 'active' : ''}`} onClick={() => setActiveTab(1)}>
+            <div className={`sidebar-nav-item ${activeTab === 1 ? 'active' : ''}`} onClick={() => handleTabChange(1)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>
               <span>Transações</span>
             </div>
-            <div className={`sidebar-nav-item ${activeTab === 2 ? 'active' : ''}`} onClick={() => setActiveTab(2)}>
+            <div className={`sidebar-nav-item ${activeTab === 2 ? 'active' : ''}`} onClick={() => handleTabChange(2)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
               <span>Futuro</span>
             </div>
-            <div className={`sidebar-nav-item ${activeTab === 3 ? 'active' : ''}`} onClick={() => setActiveTab(3)}>
+            <div className={`sidebar-nav-item ${activeTab === 3 ? 'active' : ''}`} onClick={() => handleTabChange(3)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
               <span>Relatórios</span>
             </div>
@@ -522,7 +673,7 @@ export default function Component() {
                   <div className="section">
                     <div className="section-header">
                       <div className="section-title">Próximos vencimentos</div>
-                      <a className="section-link" onClick={() => setActiveTab(2)}>Ver tudo →</a>
+                      <a className="section-link" onClick={() => handleTabChange(2)}>Ver tudo →</a>
                     </div>
                     <div className="upcoming-list">
                       {upcomingTxs.map((t: any) => {
@@ -548,7 +699,7 @@ export default function Component() {
                   <div className="section" style={{ marginTop: '20px', paddingBottom: '20px' }}>
                     <div className="section-header">
                       <div className="section-title">Transações recentes</div>
-                      <a className="section-link" onClick={() => setActiveTab(1)}>Ver tudo →</a>
+                      <a className="section-link" onClick={() => handleTabChange(1)}>Ver tudo →</a>
                     </div>
                     <div className="recent-list">
                       {recentTxs.map((t: any) => (
@@ -576,7 +727,7 @@ export default function Component() {
                 <div className="sub-nav">
                   <div className={`sub-tab ${reportTab === 'cashflow' ? 'active' : ''}`} onClick={() => setReportTab('cashflow')}>Fluxo de caixa</div>
                   <div className={`sub-tab ${reportTab === 'categories' ? 'active' : ''}`} onClick={() => setReportTab('categories')}>Por categoria</div>
-                  <div className={`sub-tab ${reportTab === 'export' ? 'active' : ''}`} onClick={() => setReportTab('export')}>Exportar</div>
+                  <div className={`sub-tab ${reportTab === 'export' ? 'active' : ''}`} onClick={() => setReportTab('export')}>Importar / Exportar</div>
                 </div>
                 
                 {reportTab === 'cashflow' && (
@@ -777,11 +928,11 @@ export default function Component() {
           </div>
 
           <div className="tabbar">
-            <div className={`tab-item ${activeTab === 0 ? 'active' : ''}`} onClick={() => setActiveTab(0)}>
+            <div className={`tab-item ${activeTab === 0 ? 'active' : ''}`} onClick={() => handleTabChange(0)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" /><path d="M9 21V12h6v9" /></svg>
               <span className="tab-label">Início</span>
             </div>
-            <div className={`tab-item ${activeTab === 1 ? 'active' : ''}`} onClick={() => setActiveTab(1)}>
+            <div className={`tab-item ${activeTab === 1 ? 'active' : ''}`} onClick={() => handleTabChange(1)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>
               <span className="tab-label">Transações</span>
             </div>
@@ -791,11 +942,11 @@ export default function Component() {
               </div>
               <span className="tab-label">Adicionar</span>
             </div>
-            <div className={`tab-item ${activeTab === 2 ? 'active' : ''}`} onClick={() => setActiveTab(2)}>
+            <div className={`tab-item ${activeTab === 2 ? 'active' : ''}`} onClick={() => handleTabChange(2)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
               <span className="tab-label">Futuro</span>
             </div>
-            <div className={`tab-item ${activeTab === 3 ? 'active' : ''}`} onClick={() => setActiveTab(3)}>
+            <div className={`tab-item ${activeTab === 3 ? 'active' : ''}`} onClick={() => handleTabChange(3)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
               <span className="tab-label">Relatórios</span>
             </div>
@@ -878,6 +1029,18 @@ export default function Component() {
                 {sheetMode === 'edit' && <button className="btn btn-danger" onClick={() => { setSheetOpen(false); setTimeout(() => setConfirmOpen(true), 180); }}>Excluir</button>}
                 <button className="btn btn-primary" onClick={handleSaveTx}>{sheetMode === 'add' ? 'Adicionar' : 'Salvar'}</button>
               </div>
+
+              {sheetMode === 'add' && (
+                <div style={{ marginTop: '24px', borderTop: '1px dashed var(--border)', paddingTop: '24px' }}>
+                  <div className="field-label" style={{ marginBottom: '8px' }}>Ou importar Extrato (OFX/XML)</div>
+                  <p style={{ fontSize: '12px', color: 'var(--text-3)', marginBottom: '12px' }}>Extraia transações automaticamente de um extrato bancário.</p>
+                  <input type="file" accept=".ofx,.xml,application/xml,text/xml" ref={fileInputRef} onChange={handleImportStatement} style={{ display: 'none' }} />
+                  <button className="btn-export" style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', width: '100%', display: 'flex', justifyContent: 'center' }} onClick={() => fileInputRef.current?.click()} disabled={previewLoading || importingStatement}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    {previewLoading ? 'Analisando arquivo...' : 'Selecionar arquivo OFX/XML'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -926,6 +1089,99 @@ export default function Component() {
           </div>
 
         </main>
+      </div>
+
+      {/* ── Import Preview Modal ── */}
+      <div className={`preview-backdrop ${previewOpen ? 'open' : ''}`} onClick={(e) => { if (e.target === e.currentTarget) handleCancelPreview(); }}>
+        <div className="preview-modal">
+          <div className="preview-header">
+            <div className="preview-header-left">
+              <div className="preview-title">Pré-visualização do extrato</div>
+              <div className="preview-subtitle">{pendingFile?.name} · {previewTxs.length} transação(ões)</div>
+            </div>
+            <button className="preview-close" onClick={handleCancelPreview}>✕</button>
+          </div>
+
+          <div style={{ padding: '12px 22px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface2)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
+              <input 
+                type="checkbox" 
+                checked={selectedTxIndices.size === previewTxs.length && previewTxs.length > 0}
+                onChange={toggleAllTxs}
+                style={{ width: '16px', height: '16px', accentColor: 'var(--accent)' }}
+              />
+              Selecionar todas ({selectedTxIndices.size}/{previewTxs.length})
+            </label>
+          </div>
+
+          <div className="preview-summary">
+            <div className="preview-stat">
+              <div className="preview-stat-label">Receitas Selecionadas</div>
+              <div className="preview-stat-val" style={{ color: 'var(--credit)' }}>
+                + R$ {previewTxs.filter((t, i) => t.direction === true && selectedTxIndices.has(i)).reduce((s: number, t: any) => s + (t.amount || 0), 0).toFixed(2).replace('.', ',')}
+              </div>
+            </div>
+            <div className="preview-stat">
+              <div className="preview-stat-label">Despesas Selecionadas</div>
+              <div className="preview-stat-val" style={{ color: 'var(--debit)' }}>
+                - R$ {previewTxs.filter((t, i) => t.direction === false && selectedTxIndices.has(i)).reduce((s: number, t: any) => s + (t.amount || 0), 0).toFixed(2).replace('.', ',')}
+              </div>
+            </div>
+          </div>
+
+          <div className="preview-list">
+            {previewTxs.map((t: any, i: number) => {
+              const isCredit = t.direction === true;
+              const dir = isCredit ? 'credit' : 'debit';
+              const dateStr = t.competenceDate
+                ? new Date(t.competenceDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                : '—';
+              return (
+                <label key={i} className="preview-item" style={{ cursor: 'pointer', opacity: selectedTxIndices.has(i) ? 1 : 0.4 }}>
+                  <input 
+                    type="checkbox" 
+                    checked={selectedTxIndices.has(i)}
+                    onChange={() => toggleTxSelection(i)}
+                    style={{ width: '16px', height: '16px', accentColor: 'var(--accent)' }}
+                  />
+                  <div className={`preview-item-icon ${dir}`}>
+                    {isCredit ? '↑' : '↓'}
+                  </div>
+                  <div className="preview-item-body">
+                    <div className="preview-item-desc">{t.description || 'Sem descrição'}</div>
+                    <div className="preview-item-date">{dateStr}</div>
+                  </div>
+                  <div className={`preview-item-amount ${dir}`}>
+                    {isCredit ? '+ ' : '- '}R$ {(t.amount || 0).toFixed(2).replace('.', ',')}
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+
+          <div className="preview-footer">
+            <button className="btn btn-ghost" onClick={handleCancelPreview} style={{ flex: 1 }}>Cancelar</button>
+            <button className="btn btn-primary" onClick={handleConfirmImport} disabled={importingStatement || selectedTxIndices.size === 0} style={{ flex: 2 }}>
+              {importingStatement ? 'Importando...' : `Importar ${selectedTxIndices.size} transação(ões)`}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Toast Notifications ── */}
+      <div className="toast-container">
+        {toasts.map(t => (
+          <div key={t.id} className={`toast ${t.type} ${t.exiting ? 'exiting' : ''}`}>
+            <div className="toast-icon">
+              {t.type === 'success' ? '✓' : t.type === 'error' ? '✕' : '⚠'}
+            </div>
+            <div className="toast-body">
+              <div className="toast-title">{t.title}</div>
+              <div className="toast-msg">{t.msg}</div>
+            </div>
+            <button className="toast-close" onClick={() => dismissToast(t.id)}>✕</button>
+          </div>
+        ))}
       </div>
     </>
   );
