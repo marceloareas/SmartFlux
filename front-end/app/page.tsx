@@ -170,7 +170,7 @@ export default function Component() {
       window.location.href = '/login';
       return;
     }
-    
+
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab');
@@ -323,10 +323,38 @@ export default function Component() {
     return animals[Math.abs(hash) % animals.length];
   };
 
-  const handleExportCsv = async () => {
+  const handleExportCsv = () => {
     try {
-      const res = await fetchApi(`/api/transactions/export?startDate=${exportStart}&endDate=${exportEnd}&t=${Date.now()}`);
-      const blob = await res.blob();
+      const startDate = new Date(exportStart + 'T00:00:00');
+      const endDate = new Date(exportEnd + 'T23:59:59');
+
+      // Filtra as transações aplicando a regra do "exportInclude" (idêntico ao PDF)
+      const periodTxs = txs.filter((t: any) => {
+        if (t.type !== 'tx') return false;
+        if (exportInclude === 'completed' && t.isPending) return false;
+        const td = new Date(t.dateObj);
+        return td >= startDate && td <= endDate;
+      });
+
+      // Definição dos cabeçalhos das colunas
+      const headers = ['Data', 'Descrição', 'Categoria', 'Valor'];
+
+      // Montagem das linhas utilizando o ponto e vírgula (;) como separador para compatibilidade com o Excel em português
+      const csvRows = [headers.join(';')];
+
+      periodTxs.forEach((t: any) => {
+        const row = [
+          new Date(t.dateObj).toLocaleDateString('pt-BR'),
+          `"${(t.desc || 'Sem descrição').replace(/"/g, '""')}"`,
+          `"${(t.category || 'Sem categoria').replace(/"/g, '""')}"`,
+          (t.dir === 'debit' ? '-' : '+') + t.rawAmount.toFixed(2).replace('.', ',')
+        ];
+        csvRows.push(row.join(';'));
+      });
+
+      // Adiciona o caractere de marcação BOM (\uFEFF) para que o Excel abra com acentuação correta
+      const csvContent = '\uFEFF' + csvRows.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
 
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -335,10 +363,12 @@ export default function Component() {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      window.URL.revokeObjectURL(url); setExportMenuOpen(false);
+      window.URL.revokeObjectURL(url);
+
+      setExportMenuOpen(false);
     } catch (e) {
       console.error('Erro ao exportar CSV', e);
-      alert('Erro ao exportar o relatório');
+      alert('Erro ao exportar o relatório CSV');
     }
   };
 
@@ -530,17 +560,17 @@ export default function Component() {
   const today = new Date();
   const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const currentMonthTxs = allTxs.filter((t: any) => new Date(t.dateObj) >= currentMonthStart);
-  
+
   const currentIncome = currentMonthTxs.filter((t: any) => t.dir === 'credit').reduce((acc, t) => acc + t.rawAmount, 0);
   const currentExpense = currentMonthTxs.filter((t: any) => t.dir === 'debit').reduce((acc, t) => acc + t.rawAmount, 0);
   const currentNet = currentIncome - currentExpense;
 
   const upcomingTxs = txs.filter((t: any) => t.type === 'tx' && t.isPending)
-                         .sort((a: any, b: any) => new Date(a.dateObj).getTime() - new Date(b.dateObj).getTime())
-                         .slice(0, 3);
+    .sort((a: any, b: any) => new Date(a.dateObj).getTime() - new Date(b.dateObj).getTime())
+    .slice(0, 3);
   const recentTxs = txs.filter((t: any) => t.type === 'tx' && !t.isPending)
-                       .sort((a: any, b: any) => new Date(b.dateObj).getTime() - new Date(a.dateObj).getTime())
-                       .slice(0, 4);
+    .sort((a: any, b: any) => new Date(b.dateObj).getTime() - new Date(a.dateObj).getTime())
+    .slice(0, 4);
 
   const last6Months = Array.from({ length: 6 }).map((_, i) => {
     const d = new Date(today.getFullYear(), today.getMonth() - 5 + i, 1);
@@ -637,7 +667,7 @@ export default function Component() {
             </div>
             <span className="logo-name">SmartFlux</span>
           </div>
-          
+
           <button className="sidebar-add-btn" onClick={openAddSheet}>
             <svg viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" stroke="currentColor" style={{ width: 16, height: 16 }}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
             Nova transação
@@ -705,7 +735,7 @@ export default function Component() {
                 <div className="balance-hero">
                   <div className="balance-period">
                     <span className="period-dot"></span>
-                    <span style={{textTransform:'capitalize'}}>{today.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace('.', '')}</span>
+                    <span style={{ textTransform: 'capitalize' }}>{today.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace('.', '')}</span>
                   </div>
                   <div className="balance-label">Fluxo de caixa líquido</div>
                   <div className={`balance-amount ${currentNet >= 0 ? 'positive' : 'negative'}`}>
@@ -731,13 +761,13 @@ export default function Component() {
                     </div>
                     <div className="upcoming-list">
                       {upcomingTxs.map((t: any) => {
-                        const overdue = new Date(t.dateObj).setHours(0,0,0,0) < new Date().setHours(0,0,0,0);
+                        const overdue = new Date(t.dateObj).setHours(0, 0, 0, 0) < new Date().setHours(0, 0, 0, 0);
                         return (
                           <div key={t.id} className={`upcoming-card ${overdue ? 'overdue' : t.dir}`} onClick={() => { setDetail(t); setDetailOpen(true); }}>
                             <div className="uc-icon" style={{ background: t.bg, color: t.color }}>{t.icon}</div>
                             <div className="uc-body">
                               <div className="uc-desc">{t.desc}</div>
-                              <div className="uc-meta">{t.category ? `${t.category} · ` : ''}{new Date(t.dateObj).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</div>
+                              <div className="uc-meta">{t.category ? `${t.category} · ` : ''}{new Date(t.dateObj).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</div>
                             </div>
                             {overdue && <div className="overdue-pill">Atrasada</div>}
                             <div className="uc-amount" style={{ color: overdue ? 'var(--warning)' : t.dir === 'debit' ? 'var(--debit)' : 'var(--credit)' }}>
@@ -746,7 +776,7 @@ export default function Component() {
                           </div>
                         )
                       })}
-                      {upcomingTxs.length === 0 && <div style={{textAlign: 'center', color: 'var(--text-3)', padding: '10px', fontSize: '13px'}}>Nenhum vencimento futuro.</div>}
+                      {upcomingTxs.length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: '10px', fontSize: '13px' }}>Nenhum vencimento futuro.</div>}
                     </div>
                   </div>
 
@@ -761,14 +791,14 @@ export default function Component() {
                           <div className="tx-card-icon" style={{ background: t.bg, color: t.color }}>{t.icon}</div>
                           <div className="tx-card-body">
                             <div className="tx-card-desc">{t.desc}</div>
-                            <div className="tx-card-meta">{t.category ? `${t.category} · ` : ''}{new Date(t.dateObj).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</div>
+                            <div className="tx-card-meta">{t.category ? `${t.category} · ` : ''}{new Date(t.dateObj).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</div>
                           </div>
                           <div className="tx-card-amount">
                             {t.dir === 'debit' ? '- ' : '+ '}{t.amount.replace('R$ ', '')}
                           </div>
                         </div>
                       ))}
-                      {recentTxs.length === 0 && <div style={{textAlign: 'center', color: 'var(--text-3)', padding: '10px', fontSize: '13px'}}>Nenhuma transação recente.</div>}
+                      {recentTxs.length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: '10px', fontSize: '13px' }}>Nenhuma transação recente.</div>}
                     </div>
                   </div>
                 </div>
@@ -785,7 +815,7 @@ export default function Component() {
                   <div className={`sub-tab ${reportTab === 'prediction' ? 'active' : ''}`} onClick={() => setReportTab('prediction')}>Previsão IA</div>
                   <div className={`sub-tab ${reportTab === 'export' ? 'active' : ''}`} onClick={() => setReportTab('export')}>Exportar</div>
                 </div>
-                
+
                 {reportTab === 'cashflow' && (
                   <div className="panel active">
                     <div className="period-bar">
@@ -793,7 +823,7 @@ export default function Component() {
                       <button className={`period-btn ${reportPeriod === '6months' ? 'active' : ''}`} style={{ opacity: reportPeriod === '6months' ? 1 : 0.5 }} onClick={() => setReportPeriod('6months')}>6 meses</button>
                       <div className="period-nav">
                         {reportPeriod === 'monthly' && (
-                          <div className="period-current" style={{textTransform:'capitalize'}}>{activeMonthLabel}</div>
+                          <div className="period-current" style={{ textTransform: 'capitalize' }}>{activeMonthLabel}</div>
                         )}
                       </div>
                     </div>
@@ -825,7 +855,7 @@ export default function Component() {
                                 <div className="bar-seg income" style={{ height: `${Math.max(4, (m.income / maxChartVal) * 70)}px` }}></div>
                                 <div className="bar-seg expense" style={{ height: `${Math.max(4, (m.expense / maxChartVal) * 70)}px` }}></div>
                               </div>
-                              <div className="bar-month" style={{textTransform:'capitalize'}}>{m.month.replace('.','')}</div>
+                              <div className="bar-month" style={{ textTransform: 'capitalize' }}>{m.month.replace('.', '')}</div>
                             </div>
                           ))}
                         </div>
@@ -837,14 +867,14 @@ export default function Component() {
 
                       {reportPeriod === '6months' && (
                         <div className="breakdown-list">
-                          <div style={{fontSize:'11px',fontWeight:600,letterSpacing:'.07em',textTransform:'uppercase',color:'var(--text-3)',marginBottom:'2px'}}>Líquido por mês</div>
+                          <div style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: '2px' }}>Líquido por mês</div>
                           {last6Months.slice().reverse().map((m, i) => {
                             const maxNet = Math.max(1, ...last6Months.map(x => Math.abs(x.net)));
                             const pct = Math.max(2, (Math.abs(m.net) / maxNet) * 100);
                             const isPos = m.net >= 0;
                             return (
                               <div key={i} className="breakdown-row">
-                                <div className="breakdown-month" style={{textTransform:'capitalize'}}>{m.month.replace('.','')}</div>
+                                <div className="breakdown-month" style={{ textTransform: 'capitalize' }}>{m.month.replace('.', '')}</div>
                                 <div className="breakdown-bar-wrap"><div className="breakdown-bar-fill" style={{ width: `${pct}%`, background: isPos ? 'var(--accent)' : 'var(--debit)' }}></div></div>
                                 <div className="breakdown-val" style={{ color: isPos ? 'var(--accent)' : 'var(--debit)' }}>
                                   {isPos ? '+' : '-'}R$ {Math.abs(m.net).toFixed(2).replace('.', ',')}
@@ -861,7 +891,7 @@ export default function Component() {
                 {reportTab === 'categories' && (
                   <div className="panel active">
                     <div className="cat-summary">
-                      <div className="cat-total-label">Total gasto — <span style={{textTransform:'capitalize'}}>{activeMonthLabel}</span></div>
+                      <div className="cat-total-label">Total gasto — <span style={{ textTransform: 'capitalize' }}>{activeMonthLabel}</span></div>
                       <div className="cat-total-val">R$ {activeMonthData.expense.toFixed(2).replace('.', ',')}</div>
                     </div>
                     <div className="cat-list" style={{ marginTop: '16px' }}>
@@ -878,7 +908,7 @@ export default function Component() {
                           <div className="cat-amount">R$ {cat.total.toFixed(2).replace('.', ',')}</div>
                         </div>
                       ))}
-                      {sortedCats.length === 0 && <div style={{textAlign: 'center', color: 'var(--text-3)', padding: '20px'}}>Nenhuma despesa neste mês.</div>}
+                      {sortedCats.length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: '20px' }}>Nenhuma despesa neste mês.</div>}
                     </div>
                   </div>
                 )}
@@ -911,7 +941,7 @@ export default function Component() {
                         </select>
                       </div>
                       <button className="btn-export" onClick={() => exportFormat === 'pdf' ? handleExportPdf() : handleExportCsv()}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
                         Baixar relatório
                       </button>
                     </div>
@@ -922,7 +952,7 @@ export default function Component() {
                   <div className="panel active" style={{ padding: '16px 24px 24px' }}>
                     <div className="predict-header" style={{ marginBottom: '14px' }}>
                       <div className="predict-title-ia" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 700, color: 'var(--accent)' }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></svg>
                         Previsão de Fluxo com IA
                       </div>
                       <div className="predict-desc" style={{ fontSize: '11px', color: 'var(--text-2)', marginTop: '4px', lineHeight: '1.4' }}>
@@ -951,7 +981,7 @@ export default function Component() {
 
                     {!predictData && !isPredicting && (
                       <button className="btn-predict" onClick={handleGetForecast} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', padding: '12px', background: 'var(--accent)', color: '#030D08', border: 'none', borderRadius: 'var(--radius-sm)', fontWeight: 700, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s' }}>
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2" /></svg>
                         Analisar e Projetar
                       </button>
                     )}
@@ -976,13 +1006,13 @@ export default function Component() {
 
                     {predictData && (
                       <div className="predict-results" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        
+
                         {/* Gráfico Híbrido */}
                         <div className="predict-chart-box" style={{ background: 'var(--surface2)', padding: '14px 14px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
                           <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-3)', letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: '16px' }}>
                             Tendência: Histórico vs Projeção IA
                           </div>
-                          
+
                           <div className="predict-bar-chart" style={{ display: 'flex', alignItems: 'flex-end', gap: '5px', height: '110px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
                             {allChartPoints.map((p, idx) => {
                               const heightPct = (Math.abs(p.value) / maxPredictChartVal) * 75;
@@ -993,19 +1023,19 @@ export default function Component() {
                               } else if (predictType === 'balance') {
                                 barColor = isNegative ? 'var(--debit)' : 'var(--accent)';
                               }
-                              
+
                               return (
                                 <div key={idx} className="predict-bar-col" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', minWidth: '32px' }}>
                                   <div className="predict-bar-wrap" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '80px', position: 'relative' }}>
                                     <span style={{ fontSize: '8px', fontWeight: 700, color: p.isForecast ? 'var(--accent)' : 'var(--text-2)', marginBottom: '2px', fontFamily: '"Roboto",sans-serif' }}>
-                                      {isNegative ? '-' : ''}{Math.abs(p.value) >= 1000 ? `${(Math.abs(p.value)/1000).toFixed(1)}k` : Math.abs(p.value).toFixed(0)}
+                                      {isNegative ? '-' : ''}{Math.abs(p.value) >= 1000 ? `${(Math.abs(p.value) / 1000).toFixed(1)}k` : Math.abs(p.value).toFixed(0)}
                                     </span>
-                                    <div 
-                                      className={`predict-bar-seg ${p.isForecast ? 'forecast' : ''}`} 
-                                      style={{ 
-                                        width: '100%', 
-                                        height: `${Math.max(4, heightPct)}px`, 
-                                        background: barColor, 
+                                    <div
+                                      className={`predict-bar-seg ${p.isForecast ? 'forecast' : ''}`}
+                                      style={{
+                                        width: '100%',
+                                        height: `${Math.max(4, heightPct)}px`,
+                                        background: barColor,
                                         borderRadius: '3px',
                                         border: p.isForecast ? '1.5px dashed var(--accent)' : 'none',
                                         boxShadow: p.isForecast ? '0 0 8px rgba(0, 214, 143, 0.25)' : 'none'
@@ -1020,7 +1050,7 @@ export default function Component() {
                               );
                             })}
                           </div>
-                          
+
                           <div className="chart-legend" style={{ display: 'flex', gap: '10px', marginTop: '12px', justifyContent: 'center' }}>
                             <div className="legend-item" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '9px', color: 'var(--text-2)' }}>
                               <div className="legend-dot" style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--text-2)' }}></div> Histórico
@@ -1041,7 +1071,7 @@ export default function Component() {
                               const foreAvg = forecastPoints.reduce((acc: number, p: any) => acc + p.value, 0) / Math.max(1, forecastPoints.length);
                               const diff = foreAvg - histAvg;
                               const pct = histAvg !== 0 ? (diff / Math.abs(histAvg)) * 100 : 0;
-                              
+
                               if (predictType === 'balance') {
                                 if (foreAvg > histAvg) {
                                   return `Sua tendência de saldo líquido aponta para um crescimento de cerca de ${Math.abs(pct).toFixed(1)}% em comparação à média recente. Isso indica uma situação saudável no fluxo de caixa futuro.`;
@@ -1082,7 +1112,7 @@ export default function Component() {
                             </div>
                           ))}
                         </div>
-                        
+
                         <button className="btn btn-ghost" onClick={() => setPredictData(null)} style={{ fontSize: '12px', padding: '10px' }}>
                           Limpar e Configurar Nova Análise
                         </button>
@@ -1094,64 +1124,64 @@ export default function Component() {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
                 <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div className="page-title">{activeTab === 0 ? 'Início' : activeTab === 2 ? 'Futuro' : activeTab === 3 ? 'Relatórios' : 'Transações'}</div>
-                <div className="flow-summary">
-                  <span className="flow-label">Fluxo atual:</span>
-                  <span className={`flow-value ${flowTotal >= 0 ? 'positive' : 'negative'}`}>
-                    R$ {Math.abs(flowTotal).toFixed(2).replace('.', ',')}
-                  </span>
-                </div>
-              </div>
-              <div style={{ position: 'relative' }}>
-              </div>
-            </div>
-
-            {activeTab !== 2 && (
-              <div className="filter-bar">
-                <button className={`chip ${currentFilter === 'all' ? 'active' : ''}`} onClick={() => setCurrentFilter('all')}>Todas</button>
-                <button className={`chip debit-chip ${currentFilter === 'debit' ? 'active' : ''}`} onClick={() => setCurrentFilter('debit')}>Despesas</button>
-                <button className={`chip credit-chip ${currentFilter === 'credit' ? 'active' : ''}`} onClick={() => setCurrentFilter('credit')}>Receitas</button>
-              </div>
-            )}
-
-            <div className="tx-list" id="txList">
-              {txs.filter((t: any) => {
-                if (t.type === 'month') return true;
-                if (activeTab === 2) return t.isPending;
-                if (t.isPending) return false;
-                if (currentFilter === 'all') return true;
-                return t.dir === currentFilter;
-              }).map((t: any) => {
-                if (t.type === 'month') {
-                  // Find this month's index in the ORIGINAL txs array to get the correct section
-                  const fullIdx = txs.findIndex(x => x === t);
-                  const nextMonthIdx = txs.slice(fullIdx + 1).findIndex(x => x.type === 'month');
-                  const sectionTxs = txs.slice(fullIdx + 1, nextMonthIdx === -1 ? undefined : fullIdx + 1 + nextMonthIdx);
-
-                  let show = false;
-                  if (activeTab === 2) {
-                    show = sectionTxs.some(x => x.type === 'tx' && x.isPending);
-                  } else {
-                    if (currentFilter === 'all') show = sectionTxs.some(x => x.type === 'tx' && !x.isPending);
-                    else show = sectionTxs.some(x => x.type === 'tx' && x.dir === currentFilter && !x.isPending);
-                  }
-
-                  if (!show) return null;
-                  return <div key={`month-${t.label}`} className="month-label">{t.label}</div>;
-                }
-                return (
-                  <div key={t.id} className={`tx-card ${t.dir}`} onClick={() => { setDetail(t); setDetailOpen(true); }}>
-                    <div className="tx-card-icon" style={{ background: t.bg, color: t.color }}>{t.icon}</div>
-                    <div className="tx-card-body">
-                      <div className="tx-card-desc">{t.desc}</div>
-                      <div className="tx-card-meta">{t.category ? `${t.category} · ${t.date.slice(0, 5)}` : `${t.date.slice(0, 5)} · Sem categoria`}</div>
+                  <div>
+                    <div className="page-title">{activeTab === 0 ? 'Início' : activeTab === 2 ? 'Futuro' : activeTab === 3 ? 'Relatórios' : 'Transações'}</div>
+                    <div className="flow-summary">
+                      <span className="flow-label">Fluxo atual:</span>
+                      <span className={`flow-value ${flowTotal >= 0 ? 'positive' : 'negative'}`}>
+                        R$ {Math.abs(flowTotal).toFixed(2).replace('.', ',')}
+                      </span>
                     </div>
-                    <div className="tx-card-amount">{t.dir === 'debit' ? '- ' : '+ '}{t.amount.replace('R$ ', '')}</div>
                   </div>
-                );
-              })}
-            </div>
+                  <div style={{ position: 'relative' }}>
+                  </div>
+                </div>
+
+                {activeTab !== 2 && (
+                  <div className="filter-bar">
+                    <button className={`chip ${currentFilter === 'all' ? 'active' : ''}`} onClick={() => setCurrentFilter('all')}>Todas</button>
+                    <button className={`chip debit-chip ${currentFilter === 'debit' ? 'active' : ''}`} onClick={() => setCurrentFilter('debit')}>Despesas</button>
+                    <button className={`chip credit-chip ${currentFilter === 'credit' ? 'active' : ''}`} onClick={() => setCurrentFilter('credit')}>Receitas</button>
+                  </div>
+                )}
+
+                <div className="tx-list" id="txList">
+                  {txs.filter((t: any) => {
+                    if (t.type === 'month') return true;
+                    if (activeTab === 2) return t.isPending;
+                    if (t.isPending) return false;
+                    if (currentFilter === 'all') return true;
+                    return t.dir === currentFilter;
+                  }).map((t: any) => {
+                    if (t.type === 'month') {
+                      // Find this month's index in the ORIGINAL txs array to get the correct section
+                      const fullIdx = txs.findIndex(x => x === t);
+                      const nextMonthIdx = txs.slice(fullIdx + 1).findIndex(x => x.type === 'month');
+                      const sectionTxs = txs.slice(fullIdx + 1, nextMonthIdx === -1 ? undefined : fullIdx + 1 + nextMonthIdx);
+
+                      let show = false;
+                      if (activeTab === 2) {
+                        show = sectionTxs.some(x => x.type === 'tx' && x.isPending);
+                      } else {
+                        if (currentFilter === 'all') show = sectionTxs.some(x => x.type === 'tx' && !x.isPending);
+                        else show = sectionTxs.some(x => x.type === 'tx' && x.dir === currentFilter && !x.isPending);
+                      }
+
+                      if (!show) return null;
+                      return <div key={`month-${t.label}`} className="month-label">{t.label}</div>;
+                    }
+                    return (
+                      <div key={t.id} className={`tx-card ${t.dir}`} onClick={() => { setDetail(t); setDetailOpen(true); }}>
+                        <div className="tx-card-icon" style={{ background: t.bg, color: t.color }}>{t.icon}</div>
+                        <div className="tx-card-body">
+                          <div className="tx-card-desc">{t.desc}</div>
+                          <div className="tx-card-meta">{t.category ? `${t.category} · ${t.date.slice(0, 5)}` : `${t.date.slice(0, 5)} · Sem categoria`}</div>
+                        </div>
+                        <div className="tx-card-amount">{t.dir === 'debit' ? '- ' : '+ '}{t.amount.replace('R$ ', '')}</div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -1265,7 +1295,7 @@ export default function Component() {
                   <p style={{ fontSize: '12px', color: 'var(--text-3)', marginBottom: '12px' }}>Extraia transações automaticamente de um extrato bancário.</p>
                   <input type="file" ref={fileInputRef} onChange={handleImportStatement} style={{ display: 'none' }} />
                   <button className="btn-export" style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', width: '100%', display: 'flex', justifyContent: 'center' }} onClick={() => fileInputRef.current?.click()} disabled={previewLoading || importingStatement}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
                     {previewLoading ? 'Analisando arquivo...' : 'Selecionar arquivo OFX/XML'}
                   </button>
                 </div>
@@ -1333,8 +1363,8 @@ export default function Component() {
 
           <div style={{ padding: '12px 22px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface2)' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
-              <input 
-                type="checkbox" 
+              <input
+                type="checkbox"
                 checked={selectedTxIndices.size === previewTxs.length && previewTxs.length > 0}
                 onChange={toggleAllTxs}
                 style={{ width: '16px', height: '16px', accentColor: 'var(--accent)' }}
@@ -1367,8 +1397,8 @@ export default function Component() {
                 : '—';
               return (
                 <label key={i} className="preview-item" style={{ cursor: 'pointer', opacity: selectedTxIndices.has(i) ? 1 : 0.4 }}>
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     checked={selectedTxIndices.has(i)}
                     onChange={() => toggleTxSelection(i)}
                     style={{ width: '16px', height: '16px', accentColor: 'var(--accent)' }}
