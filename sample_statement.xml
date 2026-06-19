@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Transactions>
+    <Transaction>
+        <Date>2026-06-10T09:00:00</Date>
+        <Description>Uber Viagem</Description>
+        <Amount>-25.50</Amount>
+    </Transaction>
+    <Transaction>
+        <Date>2026-06-12T12:30:00</Date>
+        <Description>Ifood Almoco</Description>
+        <Amount>-45.90</Amount>
+    </Transaction>
+    <Transaction>
+        <Date>2026-06-15T10:00:00</Date>
+        <Description>Reembolso Despesas</Description>
+        <Amount>300.00</Amount>
+    </Transaction>
+</Transactions>
